@@ -42,7 +42,7 @@
     "typescript": "^5"
   },
   "exports": {
-    "./globals.css": "./src/styles/globals.css",
+    "./styles/*": "./src/styles/*.css",
     "./postcss.config": "./postcss.config.mjs",
     "./lib/*": "./src/lib/*.ts",
     "./components": "./src/components/index.ts",

@@ -5,11 +5,13 @@ import { safeRedirectPath } from "@workspace/core/utils"
 import {
   defaultLocale,
   isLocale,
+  localeCookieMaxAge,
   localeCookieName,
   normalizeLocale,
   type Locale,
 } from "@workspace/i18n/config"
 
+import { localeCookieDomain } from "@/i18n/locale-cookie"
 import { routing } from "@/i18n/routing"
 
 const authApiUrl = process.env.API_INTERNAL_URL ?? "http://localhost:4000"
@@ -81,8 +83,13 @@ export async function proxy(req: NextRequest) {
     routePathName === "/" ||
     PublicRoutes.some((route) => matchesRoute(routePathName, route))
   const isLocalizedRoute = isAuthRoute || isPublicRoute || isOAuthCallback
-  const dashboardLocale =
-    normalizeLocale(req.cookies.get(localeCookieName)?.value) ?? defaultLocale
+  const cookieLocale = normalizeLocale(
+    req.cookies.get(localeCookieName)?.value
+  )
+  const browserLocale = getBrowserLocale(
+    req.headers.get("accept-language")
+  )
+  const dashboardLocale = cookieLocale ?? browserLocale ?? defaultLocale
 
   // Public marketing pages do not make routing decisions from the session.
   // Resolve it only for auth/protected routes, or while a 2FA flow is pending.
@@ -124,7 +131,13 @@ export async function proxy(req: NextRequest) {
       ? handleI18nRouting(req)
       : authResponse
 
-  return appendCallbackCookie(req, response, isAuthRoute)
+  const callbackResponse = appendCallbackCookie(req, response, isAuthRoute)
+
+  return appendInitialLocaleCookie(
+    req,
+    callbackResponse,
+    routeLocale ?? dashboardLocale
+  )
 }
 
 async function getSession(req: NextRequest): Promise<ProxySession | null> {
@@ -273,6 +286,40 @@ function localizedPath(pathname: string, locale: Locale) {
   return pathname === "/" ? `/${locale}` : `/${locale}${pathname}`
 }
 
+function getBrowserLocale(acceptLanguage: string | null): Locale | null {
+  if (!acceptLanguage) return null
+
+  const preferences = acceptLanguage
+    .split(",")
+    .map((entry, index) => {
+      const [languageTag, ...parameters] = entry.trim().split(";")
+      const qualityValue = parameters
+        .map((parameter) => parameter.trim())
+        .find((parameter) => parameter.startsWith("q="))
+        ?.slice(2)
+      const parsedQuality = qualityValue ? Number(qualityValue) : 1
+
+      return {
+        index,
+        languageTag,
+        quality: Number.isFinite(parsedQuality) ? parsedQuality : 0,
+      }
+    })
+    .filter(({ quality }) => quality > 0)
+    .sort((left, right) =>
+      right.quality === left.quality
+        ? left.index - right.index
+        : right.quality - left.quality
+    )
+
+  for (const { languageTag } of preferences) {
+    const locale = normalizeLocale(languageTag)
+    if (locale) return locale
+  }
+
+  return null
+}
+
 function matchesRoute(pathname: string, route: string) {
   return pathname === route || pathname.startsWith(`${route}/`)
 }
@@ -329,6 +376,27 @@ function appendCallbackCookie(
       maxAge: 60 * 60, // 1 hour
     })
   }
+  return response
+}
+
+function appendInitialLocaleCookie(
+  req: NextRequest,
+  response: NextResponse,
+  locale: Locale
+) {
+  if (req.cookies.has(localeCookieName)) return response
+
+  const fetchDestination = req.headers.get("sec-fetch-dest")
+  if (fetchDestination && fetchDestination !== "document") return response
+
+  response.cookies.set(localeCookieName, locale, {
+    ...(localeCookieDomain ? { domain: localeCookieDomain } : {}),
+    path: "/",
+    maxAge: localeCookieMaxAge,
+    sameSite: "lax",
+    secure: process.env.NODE_ENV === "production",
+  })
+
   return response
 }
 

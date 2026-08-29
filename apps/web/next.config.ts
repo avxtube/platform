@@ -11,15 +11,16 @@ const nextConfig: NextConfig = {
     "@workspace/ui",
   ],
   allowedDevOrigins: ["avxtube.org"],
-   rewrites: async () => {
+  devIndicators: false,
+  rewrites: async () => {
     return [
       {
         source: "/api/auth/:path*",
         destination: `${apiUrl}/api/auth/:path*`,
       },
       {
-        source: "/api/v2/:path*",
-        destination: `${apiUrl}/v2/:path*`,
+        source: "/api/v1/:path*",
+        destination: `${apiUrl}/v1/:path*`,
       },
     ]
   },
