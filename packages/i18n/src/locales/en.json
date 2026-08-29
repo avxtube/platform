@@ -1,0 +1,12 @@
+{
+  "language": {
+    "label": "Language",
+    "english": "English",
+    "thai": "ไทย"
+  },
+  "auth": {
+    "logIn": "Log in",
+    "getStarted": "Get started",
+    "logOut": "Log out"
+  }
+}

@@ -1,0 +1,12 @@
+{
+  "language": {
+    "label": "ภาษา",
+    "english": "English",
+    "thai": "ไทย"
+  },
+  "auth": {
+    "logIn": "เข้าสู่ระบบ",
+    "getStarted": "เริ่มต้นใช้งาน",
+    "logOut": "ออกจากระบบ"
+  }
+}
