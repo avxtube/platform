@@ -3,7 +3,9 @@
   "compilerOptions": {
     "paths": {
       "@workspace/ui/*": ["./src/*"]
-    }
+    },
+    "moduleResolution": "bundler",
+    "module": "esnext"
   },
   "include": ["."],
   "exclude": ["node_modules", "dist"]

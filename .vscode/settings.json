@@ -1,0 +1,39 @@
+{
+    "editor.formatOnSave": false,
+    "[typescript]": {
+        "editor.defaultFormatter": "vscode.typescript-language-features"
+    },
+    "[typescriptreact]": {
+        "editor.formatOnSave": false
+    },
+    "[javascript]": {
+        "editor.formatOnSave": false
+    },
+    "[javascriptreact]": {
+        "editor.formatOnSave": false
+    },
+    "[json]": {
+        "editor.formatOnSave": false
+    },
+    "[jsonc]": {
+        "editor.formatOnSave": false
+    },
+    "[yaml]": {
+        "editor.formatOnSave": false
+    },
+    "[markdown]": {
+        "editor.formatOnSave": false
+    },
+    "[html]": {
+        "editor.formatOnSave": false
+    },
+    "[css]": {
+        "editor.formatOnSave": false
+    },
+    "[scss]": {
+        "editor.formatOnSave": false
+    },
+    "[less]": {
+        "editor.formatOnSave": false
+    }
+}
