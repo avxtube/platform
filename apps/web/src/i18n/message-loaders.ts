@@ -25,7 +25,7 @@ export async function loadAppMessages(locale: Locale) {
 
   return {
     shared,
-    ...mergeMessages(englishWeb, localeWeb),
+    web: mergeMessages(englishWeb, localeWeb),
   }
 }
 

@@ -39,23 +39,8 @@ const AuthRoutes = [
   "/magic-link",
 ]
 
-// หน้ากลุ่ม (home) — สาธารณะ/การตลาด ดูได้โดยไม่ต้อง login (ตาม route tree ใน apps/web/Readme.md)
-// "/" แยกไปจัดการเองใน handleRootPath เพราะมี logic พิเศษ (เด้งผู้ใช้ที่ login แล้วออกตาม callbackUrl ฯลฯ)
-const PublicRoutes = [
-  "/features",
-  "/video-hosting",
-  "/developers",
-  "/security",
-  "/solutions",
-  "/pricing",
-  "/about",
-  "/contact",
-  "/report-abuse",
-  "/faq",
-  "/blog",
-  "/language-test",
-  "/legal",
-]
+// ทุกหน้าเป็น public โดยค่าเริ่มต้น เพิ่มเฉพาะ route ที่ต้องเข้าสู่ระบบไว้ที่นี่
+const ProtectedRoutes = ["/account", "/admin", "/history"]
 
 const Auth2FARoute = "/verify-2fa"
 
@@ -79,10 +64,10 @@ export async function proxy(req: NextRequest) {
   const isAuthRoute = AuthRoutes.some((route) =>
     matchesRoute(routePathName, route)
   )
-  const isPublicRoute =
-    routePathName === "/" ||
-    PublicRoutes.some((route) => matchesRoute(routePathName, route))
-  const isLocalizedRoute = isAuthRoute || isPublicRoute || isOAuthCallback
+  const isProtectedRoute = ProtectedRoutes.some((route) =>
+    matchesRoute(routePathName, route)
+  )
+  const isLocalizedRoute = !isProtectedRoute
   const cookieLocale = normalizeLocale(
     req.cookies.get(localeCookieName)?.value
   )
@@ -91,10 +76,11 @@ export async function proxy(req: NextRequest) {
   )
   const dashboardLocale = cookieLocale ?? browserLocale ?? defaultLocale
 
-  // Public marketing pages do not make routing decisions from the session.
+  // Public pages do not make routing decisions from the session.
   // Resolve it only for auth/protected routes, or while a 2FA flow is pending.
   const shouldResolveSession =
-    Boolean(sessionCookie) && (!isPublicRoute || Boolean(twoFactorCookie))
+    Boolean(sessionCookie) &&
+    (isAuthRoute || isProtectedRoute || Boolean(twoFactorCookie))
   const session = shouldResolveSession ? await getSession(req) : null
 
   // 3. Construct URLs
@@ -116,7 +102,7 @@ export async function proxy(req: NextRequest) {
     session,
     twoFactorCookie,
     isAuthRoute,
-    isPublicRoute,
+    isProtectedRoute,
     isOAuthCallback,
     currentUrl,
     accountsUrl,
@@ -186,7 +172,7 @@ function getRoutingDecision(
     session: ProxySession | null
     twoFactorCookie: ProxyCookie | undefined
     isAuthRoute: boolean
-    isPublicRoute: boolean
+    isProtectedRoute: boolean
     isOAuthCallback: boolean
     currentUrl: string
     accountsUrl: string
@@ -198,7 +184,7 @@ function getRoutingDecision(
     session,
     twoFactorCookie,
     isAuthRoute,
-    isPublicRoute,
+    isProtectedRoute,
     isOAuthCallback,
     currentUrl,
     accountsUrl,
@@ -239,7 +225,7 @@ function getRoutingDecision(
   }
 
   // Restrict access to Protected Routes for unauthenticated users
-  if (!session && !isAuthRoute && !isPublicRoute) {
+  if (!session && isProtectedRoute) {
     return redirectTo(
       accountsUrl,
       localizedPath("/login", locale),

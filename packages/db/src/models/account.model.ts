@@ -1,4 +1,6 @@
-import { InferSchemaType, model, models, Schema, type Model } from "mongoose";
+import mongoose, { type InferSchemaType, type Model } from "mongoose";
+
+const { Schema, model, models } = mongoose;
 
 const accountSchema = new Schema(
     {

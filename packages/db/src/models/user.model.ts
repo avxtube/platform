@@ -1,5 +1,6 @@
 import { UserRole } from "@workspace/core/enums";
-import { Schema, model, models, InferSchemaType, type Model } from "mongoose";
+import mongoose, { type InferSchemaType, type Model } from "mongoose";
+const { Schema, model, models } = mongoose;
 
 const userSchema = new Schema(
     {

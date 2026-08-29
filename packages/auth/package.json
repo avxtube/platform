@@ -1,0 +1,48 @@
+{
+  "name": "@workspace/auth",
+  "version": "1.0.0",
+  "type": "module",
+  "private": true,
+  "scripts": {
+    "lint": "eslint . --max-warnings 0",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "better-auth": "^1.6.29",
+    "mongodb": "7.6.0",
+    "uuid": "catalog:",
+    "zod": "catalog:"
+  },
+  "peerDependencies": {
+    "next": "^14.0.0 || ^15.0.0 || ^16.0.0",
+    "react": "^18.0.0 || ^19.0.0"
+  },
+  "peerDependenciesMeta": {
+    "next": {
+      "optional": true
+    },
+    "react": {
+      "optional": true
+    }
+  },
+  "devDependencies": {
+    "@types/node": "catalog:",
+    "@types/react": "catalog:",
+    "@workspace/eslint-config": "workspace:*",
+    "@workspace/typescript-config": "workspace:*",
+    "eslint": "catalog:",
+    "next": "catalog:",
+    "react": "catalog:",
+    "typescript": "catalog:"
+  },
+  "exports": {
+    ".": "./src/index.ts",
+    "./social-provider": "./src/social-provider.ts",
+    "./client": "./src/client.ts",
+    "./constants": "./src/constants.ts",
+    "./server": "./src/server.ts",
+    "./config": "./src/config.ts",
+    "./handlers": "./src/handlers.ts",
+    "./provider": "./src/user-provider.tsx"
+  }
+}
