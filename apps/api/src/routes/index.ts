@@ -12,6 +12,9 @@ import followingRoutes from './following.routes';
 import homeRoutes from './home.routes';
 import playlistsRoutes from './playlists.routes';
 import notificationsRoutes from './notifications.routes';
+import collectionsRoutes from './collections.routes';
+import searchRoutes from './search.routes';
+import channelsRoutes from './channels.routes';
 
 const router: Router = Router();
 
@@ -25,6 +28,9 @@ router.use('/following', followingRoutes);
 router.use('/home', homeRoutes);
 router.use('/playlists', playlistsRoutes);
 router.use('/notifications', notificationsRoutes);
+router.use('/collections', collectionsRoutes);
+router.use('/search', searchRoutes);
+router.use('/channels', channelsRoutes);
 
 // Health check endpoint
 router.get('/health', (req, res) => {
@@ -41,7 +47,7 @@ router.use((req, res, next) => {
     res.status(404).json({
         error: 'Endpoint not found',
         message: `Cannot ${req.method} ${req.originalUrl}`,
-        availableEndpoints: ['/v1/health', '/v1/settings', '/v1/users', '/v1/videos', '/v1/actors', '/v1/shorts', '/v1/studio/overview', '/v1/following', '/v1/home', '/v1/playlists', '/v1/notifications']
+        availableEndpoints: ['/v1/health', '/v1/settings', '/v1/users', '/v1/videos', '/v1/channels', '/v1/actors', '/v1/shorts', '/v1/studio/overview', '/v1/following', '/v1/home', '/v1/playlists', '/v1/notifications']
     });
 });
 

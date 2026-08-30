@@ -66,14 +66,14 @@ export function VideoCard({
       </Link>
 
       <div className="mt-3 flex gap-3">
-        {!hideAvatar ? <Link href={`/actors/${video.channel.handle.replace(/^@/, "")}`} className="flex size-9 shrink-0 items-center justify-center rounded-full bg-foreground text-[11px] font-bold text-background">{getInitials(video.channel.name)}</Link> : null}
+        {!hideAvatar ? <Link href={`/channel/${video.channel.handle.replace(/^@/, "")}`} className="flex size-9 shrink-0 items-center justify-center rounded-full bg-foreground text-[11px] font-bold text-background">{getInitials(video.channel.name)}</Link> : null}
         <div className="min-w-0 flex-1">
           <Link href={href}>
             <h2 className="line-clamp-2 text-sm leading-5 font-semibold tracking-[-0.01em] group-hover:text-primary">
               {video.title}
             </h2>
           </Link>
-          <Link href={`/actors/${video.channel.handle.replace(/^@/, "")}`} className="mt-1 flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground">
+          <Link href={`/channel/${video.channel.handle.replace(/^@/, "")}`} className="mt-1 flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground">
             <span className="truncate">{video.channel.name}</span>
             {video.channel.verified ? (
               <BadgeCheck className="size-3.5 shrink-0" aria-label={verifiedLabel} />

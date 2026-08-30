@@ -34,7 +34,7 @@ export function ShortMediaPlayer({ short, active, muted, onMutedChange }: { shor
       <button type="button" aria-label={t(paused ? "play" : "pause")} onClick={() => setPaused((value) => !value)} className="absolute inset-0 grid place-items-center">
         {paused ? <Play className="size-16 fill-white text-white drop-shadow" /> : <Pause className="size-14 fill-white text-white opacity-0 transition-opacity hover:opacity-90" />}
       </button>
-      <button type="button" aria-label={t(muted ? "unmute" : "mute")} onClick={() => onMutedChange(!muted)} className="absolute top-4 right-4 z-10 grid size-10 place-items-center rounded-full bg-black/45 hover:bg-black/65">
+      <button type="button" aria-label={t(muted ? "unmute" : "mute")} onClick={() => onMutedChange(!muted)} className="absolute top-4 right-4 z-10 hidden size-10 place-items-center rounded-full bg-black/45 hover:bg-black/65 lg:grid">
         {muted ? <VolumeX className="size-5" /> : <Volume2 className="size-5" />}
       </button>
     </div>

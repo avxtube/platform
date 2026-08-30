@@ -45,6 +45,11 @@ export function useCursorPage<Item extends { id: string }>({
   }, [])
 
   const updateItems = React.useCallback((update: React.SetStateAction<Item[]>) => setItems(update), [])
+  const reset = React.useCallback((nextItems: Item[], cursor: string | null) => {
+    setItems(nextItems)
+    setNextCursor(cursor)
+    setError(null)
+  }, [])
 
   return {
     items,
@@ -54,5 +59,6 @@ export function useCursorPage<Item extends { id: string }>({
     loadMore,
     prepend,
     updateItems,
+    reset,
   }
 }

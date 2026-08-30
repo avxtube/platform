@@ -1,16 +1,22 @@
-import { BadgeCheck, Radio, UsersRound } from "lucide-react"
+import type { Locale } from "@workspace/i18n/config"
+import { getFollowingFeed, getFollowingProfiles } from "@workspace/services/queries/video"
+import { UsersRound } from "lucide-react"
 import { getTranslations } from "next-intl/server"
-
-import { Link } from "@/i18n/navigation"
-import { getFollowingProfiles } from "@workspace/services/queries/video"
+import { getCurrentUser } from "@workspace/auth/server"
+import { FollowingProfileCarousel } from "@/components/following/following-profile-carousel"
+import { FollowingVideoFeed } from "@/components/following/following-video-feed"
+import { ViewerSignInPrompt } from "@/components/viewer/viewer-sign-in-prompt"
 
 export const dynamic = "force-dynamic"
 
-export default async function FollowingPage() {
-  const [result, t] = await Promise.all([
+export default async function FollowingPage({ params }: { params: Promise<{ locale: Locale }> }) {
+  const { locale } = await params
+  const user = await getCurrentUser()
+  if (!user.userId) return <ViewerSignInPrompt kind="following" locale={locale} />
+  const [profiles, feed, t] = await Promise.all([
     getFollowingProfiles(0, 10).catch(() => ({ items: [], nextCursor: null, total: 0 })),
-    getTranslations("viewer.navigation"),
+    getFollowingFeed(0, 8).catch(() => ({ items: [], nextCursor: null, total: 0 })),
+    getTranslations({ locale, namespace: "video.following" }),
   ])
-
-  return <section><div className="mb-7 flex items-center gap-3"><UsersRound className="size-7" /><div><h1 className="text-2xl font-bold">{t("following")}</h1><p className="text-sm text-muted-foreground">{t("followingDescription", { count: result.total })}</p></div></div><div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">{result.items.map((profile) => <Link key={profile.id} href={profile.type === "actor" ? `/actors/${profile.handle}` : `/following?profile=${encodeURIComponent(profile.handle)}`} className="flex items-center gap-4 rounded-2xl border p-4 hover:bg-muted"><span className={`relative flex size-12 shrink-0 items-center justify-center rounded-full bg-foreground text-xs font-bold text-background ${profile.isLive ? "ring-2 ring-red-500 ring-offset-2 ring-offset-background" : ""}`}>{profile.initials}{profile.isLive ? <Radio className="absolute -right-1 -bottom-1 size-4 rounded-full bg-background p-0.5 text-red-500" /> : null}</span><div className="min-w-0"><p className="flex items-center gap-1 font-semibold">{profile.name}{profile.verified ? <BadgeCheck className="size-4" /> : null}</p><p className="text-xs text-muted-foreground">{t(profile.type)} • @{profile.handle}</p></div></Link>)}</div></section>
+  return <div className="space-y-10 pb-8"><header className="flex items-center gap-3"><span className="grid size-11 place-items-center rounded-full bg-primary/10 text-primary"><UsersRound className="size-6" /></span><div><h1 className="text-2xl font-black tracking-tight">{t("title")}</h1><p className="text-sm text-muted-foreground">{t("description", { count: profiles.total })}</p></div></header>{profiles.items.length ? <FollowingProfileCarousel profiles={profiles.items} /> : <p className="rounded-xl border border-dashed py-12 text-center text-sm text-muted-foreground">{t("emptyProfiles")}</p>}<FollowingVideoFeed initialPage={feed} /></div>
 }

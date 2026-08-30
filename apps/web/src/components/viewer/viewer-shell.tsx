@@ -26,7 +26,52 @@ export function ViewerShell({ children }: { children: React.ReactNode }) {
   const usesDrawer = isWatchPage || !isDesktop
   const [sidebarCollapsed, setSidebarCollapsed] = React.useState(false)
   const [drawerPathname, setDrawerPathname] = React.useState<string | null>(null)
+  const [watchHeaderVisible, setWatchHeaderVisible] = React.useState(true)
   const drawerOpen = usesDrawer && drawerPathname === pathname
+
+  React.useEffect(() => {
+    if (!isWatchPage || isDesktop) return
+
+    let previousY = window.scrollY
+    let ticking = false
+    let direction = 0
+    let directionDistance = 0
+    const initialFrame = window.requestAnimationFrame(() => {
+      previousY = window.scrollY
+      if (previousY <= 8) setWatchHeaderVisible(true)
+    })
+    const updateVisibility = () => {
+      const currentY = window.scrollY
+      const delta = currentY - previousY
+      const nextDirection = Math.sign(delta)
+
+      if (nextDirection && nextDirection !== direction) {
+        direction = nextDirection
+        directionDistance = 0
+      }
+      directionDistance += Math.abs(delta)
+
+      if (currentY <= 8 || (direction < 0 && directionDistance >= 16)) {
+        setWatchHeaderVisible(true)
+      } else if (direction > 0 && directionDistance >= 24 && currentY > 64) {
+        setWatchHeaderVisible(false)
+      }
+
+      previousY = currentY
+      ticking = false
+    }
+    const onScroll = () => {
+      if (ticking) return
+      ticking = true
+      window.requestAnimationFrame(updateVisibility)
+    }
+
+    window.addEventListener("scroll", onScroll, { passive: true })
+    return () => {
+      window.cancelAnimationFrame(initialFrame)
+      window.removeEventListener("scroll", onScroll)
+    }
+  }, [isDesktop, isWatchPage])
 
   React.useEffect(() => {
     if (!drawerOpen) return
@@ -54,15 +99,15 @@ export function ViewerShell({ children }: { children: React.ReactNode }) {
 
   return (
     <div className="min-h-svh bg-background">
-      <ViewerHeader menuExpanded={usesDrawer ? drawerOpen : !sidebarCollapsed} onMenuToggle={toggleNavigation} />
+      <div className={isShortsPage ? "hidden lg:block" : ""}><ViewerHeader watchMode={isWatchPage} mobileHidden={isWatchPage && !watchHeaderVisible && !drawerOpen} menuExpanded={usesDrawer ? drawerOpen : !sidebarCollapsed} onMenuToggle={toggleNavigation} /></div>
       {!isWatchPage && <ViewerSidebar collapsed={sidebarCollapsed} />}
       <ViewerDrawer open={drawerOpen} onClose={closeDrawer} />
-      <main className={`pt-16 transition-[padding] duration-200 ${isWatchPage ? "pb-6" : `pb-[calc(4rem+env(safe-area-inset-bottom))] lg:pb-0 ${sidebarCollapsed ? "lg:pl-[88px]" : "lg:pl-60"}`}`}>
-        <div className={`mx-auto w-full px-4 ${isWatchPage ? "max-w-[1800px] py-4 sm:px-6 lg:px-8" : isShortsPage ? "max-w-[1700px] px-0 py-0 lg:px-7 lg:py-4" : "max-w-[1700px] py-4 sm:px-6 lg:px-7"}`}>
+      <main className={`transition-[padding] duration-200 ${isShortsPage ? `pt-0 pb-0 lg:pt-16 ${sidebarCollapsed ? "lg:pl-[88px]" : "lg:pl-60"}` : isWatchPage ? "pt-16 pb-[calc(4rem+env(safe-area-inset-bottom))] lg:pb-6" : `pt-16 pb-[calc(4rem+env(safe-area-inset-bottom))] lg:pb-0 ${sidebarCollapsed ? "lg:pl-[88px]" : "lg:pl-60"}`}`}>
+        <div className={`mx-auto w-full ${isWatchPage ? "max-w-[1800px] px-0 py-0 sm:px-6 sm:py-4 lg:px-8" : isShortsPage ? "max-w-[1700px] px-0 py-0 lg:px-7 lg:py-4" : "max-w-[1700px] px-4 py-4 sm:px-6 lg:px-7"}`}>
           {children}
         </div>
       </main>
-      {!isWatchPage && <ViewerMobileNavigation />}
+      {!isShortsPage && <ViewerMobileNavigation />}
     </div>
   )
 }

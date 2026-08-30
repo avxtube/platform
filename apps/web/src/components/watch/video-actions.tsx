@@ -24,7 +24,7 @@ export function VideoActions({ video, locale }: { video: Video; locale: string }
   const shareUrl = typeof window === "undefined" ? "" : `${window.location.href}${startAt ? "?t=120" : ""}`
 
   return <>
-    <div className="flex flex-wrap gap-2">
+    <div className="flex flex-nowrap gap-2 overflow-x-auto pb-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden sm:flex-wrap sm:overflow-visible sm:pb-0">
       <div className="flex overflow-hidden rounded-full bg-muted"><button type="button" aria-pressed={liked} onClick={() => { setLiked((value) => !value); setDisliked(false) }} className="flex items-center gap-2 border-r px-4 py-2 text-sm font-semibold hover:bg-accent"><ThumbsUp className={`size-4 ${liked ? "fill-current" : ""}`} /> {Intl.NumberFormat(locale, { notation: "compact" }).format(video.viewCount / 12)}</button><button type="button" aria-label={t("dislike")} aria-pressed={disliked} onClick={() => { setDisliked((value) => !value); setLiked(false) }} className="px-4 py-2 hover:bg-accent"><ThumbsDown className={`size-4 ${disliked ? "fill-current" : ""}`} /></button></div>
       <button type="button" onClick={() => setDialog("share")} className="flex items-center gap-2 rounded-full bg-muted px-4 py-2 text-sm font-semibold hover:bg-accent"><Share2 className="size-4" />{t("share")}</button>
       <button type="button" onClick={() => setDialog("save")} className="flex items-center gap-2 rounded-full bg-muted px-4 py-2 text-sm font-semibold hover:bg-accent"><Bookmark className="size-4" />{t("save")}</button>

@@ -45,7 +45,7 @@ export function WatchPlayer({ video, theater, onTheater, playlist }: { video: Vi
     return () => document.removeEventListener("keydown", onKeyDown)
   }, [onTheater, player])
 
-  return <div ref={rootRef} id="watch-player" className="group relative aspect-video w-full overflow-hidden rounded-xl bg-black text-white">
+  return <div ref={rootRef} id="watch-player" className="group relative aspect-video w-full overflow-hidden bg-black text-white sm:rounded-xl">
     <img src={video.thumbnailUrl} alt="" className="size-full object-cover" /><div className="absolute inset-0 bg-black/20" />
     <button type="button" aria-label={t(player.isPlaying ? "pause" : "play")} onClick={player.togglePlaying} className="absolute inset-0 flex items-center justify-center"><span className="flex size-16 items-center justify-center rounded-full bg-black/55">{player.isPlaying ? <Pause className="size-7 fill-current" /> : <Play className="ml-1 size-7 fill-current" />}</span></button>
     {captions ? <p className="absolute bottom-20 left-1/2 -translate-x-1/2 rounded bg-black/80 px-3 py-1 text-sm">{t("mockCaption")}</p> : null}

@@ -14,6 +14,11 @@ import type {
   FollowingProfile,
   HomeFeedResponse,
   Playlist,
+  CollectionKind,
+  CollectionResponse,
+  SearchResponse,
+  ChannelDetailResponse,
+  HistoryResponse,
 } from "@workspace/core/types";
 
 const apiOrigin = process.env.API_INTERNAL_URL ?? "http://localhost:4000";
@@ -87,6 +92,16 @@ export async function getActor(handle: string): Promise<{ actor: Actor; videos: 
   return response.json() as Promise<{ actor: Actor; videos: Video[] }>;
 }
 
+export async function getChannel(handle: string): Promise<ChannelDetailResponse | null> {
+  const response = await fetch(new URL(`/${apiVersion}/channels/${encodeURIComponent(handle)}`, apiOrigin), {
+    headers: { accept: "application/json" },
+    cache: "no-store",
+  });
+  if (response.status === 404) return null;
+  if (!response.ok) throw new Error(`Channels API returned ${response.status} ${response.statusText}`);
+  return response.json() as Promise<ChannelDetailResponse>;
+}
+
 export async function getShorts(): Promise<ShortsResponse> {
   const page = await getShortsPage(1, 5);
   return { shorts: page.items, total: page.total };
@@ -122,6 +137,27 @@ export async function getFollowingProfiles(cursor = 0, limit = 10): Promise<Curs
   url.searchParams.set("cursor", String(cursor));
   url.searchParams.set("limit", String(limit));
   return fetchJson<CursorPage<FollowingProfile>>(url);
+}
+
+export async function getFollowingFeed(cursor = 0, limit = 8): Promise<CursorPage<Video>> {
+  const url = new URL(`/${apiVersion}/following/feed`, apiOrigin);
+  url.searchParams.set("cursor", String(cursor));
+  url.searchParams.set("limit", String(limit));
+  return fetchJson<CursorPage<Video>>(url);
+}
+
+export async function getCollection(kind: CollectionKind): Promise<CollectionResponse> {
+  return fetchJson<CollectionResponse>(new URL(`/${apiVersion}/collections/${kind}`, apiOrigin));
+}
+
+export async function getHistory(): Promise<HistoryResponse> {
+  return fetchJson<HistoryResponse>(new URL(`/${apiVersion}/collections/history`, apiOrigin));
+}
+
+export async function searchContent(params: Record<string, string>): Promise<SearchResponse> {
+  const url = new URL(`/${apiVersion}/search`, apiOrigin);
+  for (const [key, value] of Object.entries(params)) if (value) url.searchParams.set(key, value);
+  return fetchJson<SearchResponse>(url);
 }
 
 export async function getHomeFeed(): Promise<HomeFeedResponse> {

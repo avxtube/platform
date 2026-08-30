@@ -1,10 +1,9 @@
 "use client"
 
 import * as React from "react"
-import { ArrowLeft, Menu, Search } from "lucide-react"
+import { ArrowLeft, Menu, MoreVertical, Search } from "lucide-react"
 import { useTranslations } from "next-intl"
 
-import { LanguageSwitcher } from "@/components/i18n/language-switcher"
 import { useRouter } from "@/i18n/navigation"
 
 import { ViewerAuthActions } from "./viewer-auth-actions"
@@ -14,6 +13,8 @@ import { viewerRoutes } from "./viewer-routes"
 type ViewerHeaderProps = {
   menuExpanded: boolean
   onMenuToggle: () => void
+  watchMode?: boolean
+  mobileHidden?: boolean
 }
 
 function ViewerSearch({ mobile = false, onClose }: { mobile?: boolean; onClose?: () => void }) {
@@ -52,13 +53,13 @@ function ViewerSearch({ mobile = false, onClose }: { mobile?: boolean; onClose?:
   )
 }
 
-export function ViewerHeader({ menuExpanded, onMenuToggle }: ViewerHeaderProps) {
+export function ViewerHeader({ menuExpanded, onMenuToggle, watchMode = false, mobileHidden = false }: ViewerHeaderProps) {
   const t = useTranslations("viewer")
   const [mobileSearchOpen, setMobileSearchOpen] = React.useState(false)
 
   return (
     <>
-      <header className="fixed inset-x-0 top-0 z-40 grid h-16 grid-cols-[1fr_auto] items-center border-b border-border/70 bg-background/95 px-2 backdrop-blur-xl sm:px-4 md:grid-cols-[minmax(180px,1fr)_minmax(320px,42rem)_minmax(180px,1fr)]">
+      <header className={`fixed inset-x-0 top-0 z-40 grid h-16 grid-cols-[1fr_auto] items-center border-b border-border/70 bg-background/95 px-2 backdrop-blur-xl transition-transform duration-200 sm:px-4 md:grid-cols-[minmax(180px,1fr)_minmax(320px,42rem)_minmax(180px,1fr)] md:translate-y-0 ${mobileHidden ? "-translate-y-full" : "translate-y-0"}`}>
         <div className="flex shrink-0 items-center gap-2 justify-self-start sm:gap-4">
           <button
             type="button"
@@ -66,7 +67,7 @@ export function ViewerHeader({ menuExpanded, onMenuToggle }: ViewerHeaderProps) 
             aria-controls="viewer-navigation"
             aria-expanded={menuExpanded}
             onClick={onMenuToggle}
-            className="flex size-9 items-center justify-center rounded-full hover:bg-muted"
+            className={`${watchMode ? "hidden md:flex" : "flex"} size-9 items-center justify-center rounded-full hover:bg-muted`}
           >
             <Menu className="size-5" />
           </button>
@@ -87,7 +88,8 @@ export function ViewerHeader({ menuExpanded, onMenuToggle }: ViewerHeaderProps) 
           {/* <div className="hidden sm:block">
             <LanguageSwitcher />
           </div> */}
-          <ViewerAuthActions />
+          {watchMode ? <button type="button" aria-label={t("navigation.expand")} onClick={onMenuToggle} className="flex size-9 items-center justify-center rounded-full hover:bg-muted md:hidden"><MoreVertical className="size-5" /></button> : null}
+          <div className={watchMode ? "hidden md:block" : ""}><ViewerAuthActions /></div>
         </div>
       </header>
 
