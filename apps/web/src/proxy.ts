@@ -40,7 +40,7 @@ const AuthRoutes = [
 ]
 
 // ทุกหน้าเป็น public โดยค่าเริ่มต้น เพิ่มเฉพาะ route ที่ต้องเข้าสู่ระบบไว้ที่นี่
-const ProtectedRoutes = ["/account", "/admin", "/history"]
+const ProtectedRoutes = ["/account", "/admin", "/history", "/studio"]
 
 const Auth2FARoute = "/verify-2fa"
 

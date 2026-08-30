@@ -18,7 +18,7 @@ import {
   type SmartSelectOption,
 } from "@workspace/ui/components"
 
-import { localeCookieDomain } from "@/i18n/locale-cookie"
+import { writeLocaleCookie } from "@/i18n/locale-cookie"
 import { getPathname, usePathname } from "@/i18n/navigation"
 
 const languageOptions: SmartSelectOption[] = locales.map((locale) => ({
@@ -48,12 +48,7 @@ export function LanguageSwitcher() {
       href: pathname,
       locale: nextLocale,
     })
-    const secure = window.location.protocol === "https:" ? "; Secure" : ""
-    const domain = localeCookieDomain
-      ? `; Domain=${localeCookieDomain}`
-      : ""
-
-    document.cookie = `${localeCookieName}=${encodeURIComponent(nextLocale)}; Path=/; Max-Age=${localeCookieMaxAge}; SameSite=Lax${domain}${secure}`
+    writeLocaleCookie(localeCookieName, nextLocale, localeCookieMaxAge)
     router.replace(
       `${localizedPathname}${window.location.search}${window.location.hash}`,
       { scroll: false }

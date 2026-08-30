@@ -13,20 +13,24 @@ const commonLoaders = {
 
 const webLoaders = {
   en: async () => {
-    const [common, auth, page] = await Promise.all([
+    const [common, auth, page, viewer, video] = await Promise.all([
       import("./locales/en/common.json").then((item) => item.default),
       import("./locales/en/auth.json").then((item) => item.default),
       import("./locales/en/page.json").then((item) => item.default),
+      import("./locales/en/viewer.json").then((item) => item.default),
+      import("./locales/en/video.json").then((item) => item.default),
     ])
-    return { common, auth, page }
+    return { common, auth, page, viewer, video }
   },
   th: async () => {
-    const [common, auth, page] = await Promise.all([
+    const [common, auth, page, viewer, video] = await Promise.all([
       import("./locales/th/common.json").then((item) => item.default),
       import("./locales/th/auth.json").then((item) => item.default),
       import("./locales/th/page.json").then((item) => item.default),
+      import("./locales/th/viewer.json").then((item) => item.default),
+      import("./locales/th/video.json").then((item) => item.default),
     ])
-    return { common, auth, page }
+    return { common, auth, page, viewer, video }
   },
 } satisfies Record<Locale, () => Promise<Messages>>
 

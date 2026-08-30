@@ -18,6 +18,7 @@
   "exports": {
     "./config": "./src/config/index.ts",
     "./enums": "./src/enums/index.ts",
+    "./types": "./src/types/index.ts",
     "./utils": "./src/utils/index.ts",
     "./validators": "./src/validators/index.ts"
   }

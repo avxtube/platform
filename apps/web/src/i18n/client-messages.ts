@@ -15,6 +15,8 @@ export function selectClientMessages(messages: Messages) {
     auth: messages.auth,
     common: messages.common,
     page: messages.page,
+    viewer: messages.viewer,
+    video: messages.video,
     content: clientContent,
   }
 }

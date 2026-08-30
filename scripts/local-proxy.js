@@ -10,6 +10,10 @@ const routes = {
   'avxtube.org': 'http://127.0.0.1:3000',        // web
   'admin.avxtube.org': 'http://127.0.0.1:3001', // admin
   'api.avxtube.org': 'http://127.0.0.1:4000', // api
+  'vidu.local': 'http://127.0.0.1:5000',
+  'admin.vidu.local': 'http://127.0.0.1:5001',
+  'studio.vidu.local': 'http://127.0.0.1:5002',
+  'id.vidu.local': 'http://127.0.0.1:5003',
 };
 
 const server = http.createServer((req, res) => {

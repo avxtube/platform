@@ -4,11 +4,27 @@ import pkg from '../../package.json' with { type: 'json' };
 
 import usersRoutes from './users.routes';
 import settingsRoutes from './settings.routes';
+import videosRoutes from './videos.routes';
+import actorsRoutes from './actors.routes';
+import shortsRoutes from './shorts.routes';
+import studioRoutes from './studio.routes';
+import followingRoutes from './following.routes';
+import homeRoutes from './home.routes';
+import playlistsRoutes from './playlists.routes';
+import notificationsRoutes from './notifications.routes';
 
 const router: Router = Router();
 
 router.use('/users', usersRoutes);
 router.use('/settings', settingsRoutes);
+router.use('/videos', videosRoutes);
+router.use('/actors', actorsRoutes);
+router.use('/shorts', shortsRoutes);
+router.use('/studio', studioRoutes);
+router.use('/following', followingRoutes);
+router.use('/home', homeRoutes);
+router.use('/playlists', playlistsRoutes);
+router.use('/notifications', notificationsRoutes);
 
 // Health check endpoint
 router.get('/health', (req, res) => {
@@ -25,7 +41,7 @@ router.use((req, res, next) => {
     res.status(404).json({
         error: 'Endpoint not found',
         message: `Cannot ${req.method} ${req.originalUrl}`,
-        availableEndpoints: ['/v1/health', '/v1/settings', '/v1/users']
+        availableEndpoints: ['/v1/health', '/v1/settings', '/v1/users', '/v1/videos', '/v1/actors', '/v1/shorts', '/v1/studio/overview', '/v1/following', '/v1/home', '/v1/playlists', '/v1/notifications']
     });
 });
 

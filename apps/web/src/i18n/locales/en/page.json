@@ -1,7 +1,13 @@
 {
   "index": {
-    "title": "Title",
-    "description": "Description",
-    "welcome": "Welcome"
+    "title": "Videos for you",
+    "description": "Discover the latest videos from creators on AVXTUBE."
+  },
+  "watch": {
+    "metadataTitle": "Watch videos",
+    "metadataDescription": "Watch videos on AVXTUBE.",
+    "title": "Video player",
+    "description": "The video viewing experience is ready for development.",
+    "hint": "Add the player and video information components here."
   }
 }

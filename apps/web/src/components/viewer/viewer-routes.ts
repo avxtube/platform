@@ -1,0 +1,18 @@
+export const viewerRoutes = {
+  home: "/",
+  shorts: "/shorts",
+  trending: "/trending",
+  following: "/following",
+  library: "/library",
+  history: "/history",
+  watchLater: "/watch-later",
+  liked: "/liked",
+  search: "/search",
+  upload: "/upload",
+  watch: (videoId: string) => `/watch/${videoId}`,
+  short: (videoId: string) => `/shorts/${videoId}`,
+  playlist: (playlistId: string) => `/playlist/${playlistId}`,
+  actor: (handle: string) => `/actors/${handle.replace(/^@/, "")}`,
+  followedProfile: (type: "actor" | "studio", handle: string) => type === "actor" ? `/actors/${handle.replace(/^@/, "")}` : `/following?profile=${encodeURIComponent(handle)}`,
+  studio: "/studio",
+} as const
