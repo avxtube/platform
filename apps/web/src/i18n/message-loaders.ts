@@ -12,8 +12,22 @@ const commonLoaders = {
 } satisfies Record<Locale, () => Promise<Messages>>
 
 const webLoaders = {
-  en: () => import("./locales/en.json").then((item) => item.default),
-  th: () => import("./locales/th.json").then((item) => item.default),
+  en: async () => {
+    const [common, auth, page] = await Promise.all([
+      import("./locales/en/common.json").then((item) => item.default),
+      import("./locales/en/auth.json").then((item) => item.default),
+      import("./locales/en/page.json").then((item) => item.default),
+    ])
+    return { common, auth, page }
+  },
+  th: async () => {
+    const [common, auth, page] = await Promise.all([
+      import("./locales/th/common.json").then((item) => item.default),
+      import("./locales/th/auth.json").then((item) => item.default),
+      import("./locales/th/page.json").then((item) => item.default),
+    ])
+    return { common, auth, page }
+  },
 } satisfies Record<Locale, () => Promise<Messages>>
 
 export async function loadAppMessages(locale: Locale) {
@@ -25,7 +39,7 @@ export async function loadAppMessages(locale: Locale) {
 
   return {
     shared,
-    web: mergeMessages(englishWeb, localeWeb),
+    ...mergeMessages(englishWeb, localeWeb),
   }
 }
 

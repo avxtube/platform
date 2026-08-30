@@ -1,9 +1,10 @@
 import { cookies } from "next/headers"
-import { hasLocale } from "next-intl"
+import { hasLocale, IntlErrorCode } from "next-intl"
 import { getRequestConfig } from "next-intl/server"
 
 import {
   defaultLocale,
+  defaultTimeZone,
   localeCookieName,
   normalizeLocale,
   type Locale,
@@ -29,6 +30,15 @@ export default getRequestConfig(async ({ requestLocale }) => {
 
   return {
     locale,
+    timeZone: defaultTimeZone,
     messages: await loadAppMessages(locale),
+    onError(error) {
+      if (error.code !== IntlErrorCode.MISSING_MESSAGE) {
+        console.error(error)
+      }
+    },
+    getMessageFallback({ key }) {
+      return key
+    },
   }
 })

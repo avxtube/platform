@@ -19,6 +19,9 @@ catalogs:
     '@types/react':
       specifier: ^19
       version: 19.2.15
+    '@types/react-dom':
+      specifier: ^19
+      version: 19.2.3
     eslint:
       specifier: ^9
       version: 9.39.4
@@ -144,6 +147,9 @@ importers:
       '@workspace/i18n':
         specifier: workspace:*
         version: link:../../packages/i18n
+      '@workspace/services':
+        specifier: workspace:*
+        version: link:../../packages/services
       '@workspace/ui':
         specifier: workspace:*
         version: file:packages/ui(@date-fns/tz@1.5.0)(@types/react-dom@19.2.3(@types/react@19.2.15))(@types/react@19.2.15)(react-is@16.13.1)(typescript@5.9.3)
@@ -199,6 +205,9 @@ importers:
 
   packages/auth:
     dependencies:
+      '@workspace/core':
+        specifier: workspace:*
+        version: link:../core
       better-auth:
         specifier: ^1.6.29
         version: 1.7.2(mongodb@7.6.0(socks@2.8.9))(next@16.3.3(@types/node@20.19.41)(react-dom@19.2.7(react@19.2.7))(react@19.2.7))(react-dom@19.2.7(react@19.2.7))(react@19.2.7)
@@ -345,6 +354,46 @@ importers:
         version: 9.39.4(jiti@2.7.0)
       typescript:
         specifier: ^5
+        version: 5.9.3
+
+  packages/services:
+    dependencies:
+      '@workspace/auth':
+        specifier: workspace:^
+        version: link:../auth
+      '@workspace/core':
+        specifier: workspace:*
+        version: link:../core
+      next:
+        specifier: 'catalog:'
+        version: 16.3.3(@types/node@20.19.41)(react-dom@19.2.7(react@19.2.7))(react@19.2.7)
+      react:
+        specifier: 'catalog:'
+        version: 19.2.7
+      react-dom:
+        specifier: 'catalog:'
+        version: 19.2.7(react@19.2.7)
+    devDependencies:
+      '@types/node':
+        specifier: 'catalog:'
+        version: 20.19.41
+      '@types/react':
+        specifier: 'catalog:'
+        version: 19.2.15
+      '@types/react-dom':
+        specifier: 'catalog:'
+        version: 19.2.3(@types/react@19.2.15)
+      '@workspace/eslint-config':
+        specifier: workspace:*
+        version: link:../eslint-config
+      '@workspace/typescript-config':
+        specifier: workspace:*
+        version: link:../typescript-config
+      eslint:
+        specifier: 'catalog:'
+        version: 9.39.4(jiti@2.7.0)
+      typescript:
+        specifier: 'catalog:'
         version: 5.9.3
 
   packages/typescript-config: {}

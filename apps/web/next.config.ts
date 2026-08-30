@@ -8,6 +8,7 @@ const nextConfig: NextConfig = {
     "@workspace/auth",
     "@workspace/core",
     "@workspace/i18n",
+    "@workspace/services",
     "@workspace/ui",
   ],
   allowedDevOrigins: ["avxtube.org"],

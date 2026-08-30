@@ -36,7 +36,7 @@ export const authenticateUser: RequestHandler = async (req, res, next) => {
 
         const user = session.user as typeof session.user & {
             role?: unknown;
-            isDelete?: boolean;
+            // isDelete?: boolean;
         };
 
         if (user.isDelete) {

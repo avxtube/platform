@@ -16,6 +16,7 @@
     "@marsidev/react-turnstile": "catalog:",
     "@workspace/auth": "workspace:*",
     "@workspace/i18n": "workspace:*",
+    "@workspace/services": "workspace:*",
     "@workspace/ui": "workspace:*",
     "@workspace/core": "workspace:*",
     "lucide-react": "^1.31.0",

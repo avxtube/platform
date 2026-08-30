@@ -23,7 +23,7 @@ export async function updateUser(id: string, input: UpdateUserInput) {
         { $set: update },
         { new: true, runValidators: true },
     )
-        .select("_id name email emailVerified twoFactorEnabled role image country createdAt updatedAt")
+        .select("_id name username email emailVerified twoFactorEnabled role image country createdAt updatedAt")
         .lean()
         .exec();
 }

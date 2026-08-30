@@ -1,16 +1,17 @@
-import { Geist, Geist_Mono, Inter } from "next/font/google"
+import { Geist, Geist_Mono } from "next/font/google"
 
 import "@workspace/ui/styles/globals.css"
 import "@workspace/ui/styles/view-transition.css"
 import "@workspace/ui/styles/flags.css"
 
 import { ThemeProvider } from "@/components/theme-provider"
+import { IntlProvider } from "@/components/i18n/intl-provider"
 import { cn } from "@workspace/ui/lib/utils";
-import { hasLocale, NextIntlClientProvider } from "next-intl";
+import { hasLocale } from "next-intl";
 import { routing } from "@/i18n/routing";
 import { notFound } from "next/navigation";
 import { getMessages, setRequestLocale } from "next-intl/server";
-import { localeDirections, localeTags } from "@workspace/i18n";
+import { defaultTimeZone, localeDirections, localeTags } from "@workspace/i18n";
 import { Metadata } from "next";
 import { selectClientMessages } from "@/i18n/client-messages";
 
@@ -54,12 +55,13 @@ export default async function RootLayout({
     >
       <body>
         <ThemeProvider>
-          <NextIntlClientProvider
+          <IntlProvider
             locale={locale}
+            timeZone={defaultTimeZone}
             messages={selectClientMessages(messages)}
           >
             {children}
-          </NextIntlClientProvider>
+          </IntlProvider>
         </ThemeProvider>
       </body>
     </html>

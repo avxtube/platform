@@ -2,8 +2,19 @@ import { z } from "zod";
 import { emailSchema, passwordSchema } from "./common.validator";
 import { UserRole } from "../enums";
 
+export const usernameSchema = z.string()
+    .trim()
+    .min(3, { message: "invalid.usernameMin" })
+    .max(30, { message: "invalid.usernameMax" })
+    .regex(/^[a-zA-Z0-9]+$/, { message: "invalid.usernameCharacters" });
+
 export const loginSchema = z.object({
-    email: emailSchema,
+    identifier: z.string().trim().min(1, { message: "required.identifier" }).refine(
+        (value) => value.includes("@")
+            ? emailSchema.safeParse(value).success
+            : usernameSchema.safeParse(value).success,
+        { message: "invalid.identifier" },
+    ),
     password: passwordSchema,
     rememberMe: z.boolean().optional(),
 });
@@ -16,6 +27,7 @@ export type PasswordOnlyFormValues = z.infer<typeof passwordOnlySchema>;
 
 export const registerSchema = z.object({
     name: z.string().min(2, { message: "invalid.nameMin" }).trim(),
+    username: z.union([usernameSchema, z.literal("")]).optional(),
     email: emailSchema,
     password: passwordSchema,
     confirmPassword: passwordSchema,

@@ -5,24 +5,40 @@ import path from "node:path";
 import { toNodeHandler } from "better-auth/node";
 import { auth } from "@workspace/auth/config";
 import dbConnect from "@workspace/db/mongoose";
+import { registerApiAuthEvents } from "./auth/register-auth-events";
 import { requestLogger } from "./middlewares/request-logger.middleware";
 import ApiRoutes from "./routes/index";
+import { backfillUsernames } from "./services/auth/backfill-usernames.service";
 const app = express();
 // global.dirCached = path.resolve(".cached");
+
+registerApiAuthEvents();
 
 // Database connection
 async function initializeDatabase() {
     try {
-        await dbConnect();
-        console.log('✅ Database connection established');
+        const connection = await dbConnect();
+        const backfilledUsernames = await backfillUsernames(connection);
+
+        // Better Auth creates records inside a transaction. Finish any Mongoose
+        // collection/index setup before accepting requests so the first signup
+        // cannot collide with MongoDB catalog changes.
+        await Promise.all(
+            connection.modelNames().map((modelName) =>
+                connection.model(modelName).createIndexes()
+            )
+        );
+
+        if (backfilledUsernames > 0) {
+            console.log(`✅ Backfilled usernames for ${backfilledUsernames} users`);
+        }
+
+        console.log('✅ Database connection and indexes established');
     } catch (error) {
         console.error('❌ Database connection failed:', error);
         process.exit(1);
     }
 }
-
-// Initialize database connection
-initializeDatabase();
 
 // Middleware
 const allowedOrigins = (
@@ -106,8 +122,14 @@ process.on('SIGINT', () => {
     process.exit(0);
 });
 
-app.listen(PORT, () => {
-    console.log(`🚀 Server running on port ${PORT}`);
-    console.log(`📍 Environment: ${process.env.NODE_ENV || 'development'}`);
-    console.log(`🔗 Health check: http://${PORT !== "80" ? `localhost:${PORT}` : "localhost"}/${process.env.API_VERSION || "v1"}/health`);
-});
+async function startServer() {
+    await initializeDatabase();
+
+    app.listen(PORT, () => {
+        console.log(`🚀 Server running on port ${PORT}`);
+        console.log(`📍 Environment: ${process.env.NODE_ENV || 'development'}`);
+        console.log(`🔗 Health check: http://${PORT !== "80" ? `localhost:${PORT}` : "localhost"}/${process.env.API_VERSION || "v1"}/health`);
+    });
+}
+
+void startServer();

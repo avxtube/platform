@@ -1,12 +1,14 @@
 import { APIError, betterAuth } from "better-auth";
 import { mongodbAdapter } from "better-auth/adapters/mongodb";
-import { twoFactor, magicLink, customSession, captcha } from "better-auth/plugins";
+import { twoFactor, magicLink, customSession, captcha, username } from "better-auth/plugins";
 import clientPromise from "./mongodb";
 import { socialProviders } from "./social-provider";
 import type { User } from "better-auth/types";
 import { v4 as uuidv4 } from "uuid";
 import { authEvents } from "./handlers";
 import { COOKIE_PREFIX } from "./constants";
+import { normalizeUsername, usernameFromEmail } from "@workspace/core/utils";
+import { DEFAULT_AUTH_SETTING } from "@workspace/core/config";
 
 export { COOKIE_PREFIX } from "./constants";
 
@@ -18,8 +20,13 @@ type AuthUserDocument = {
     name?: string;
     isDelete?: boolean;
     updatedAt?: Date;
+    username?: string;
 };
 const users = db.collection<AuthUserDocument>("user");
+const settings = db.collection<{
+    name: string;
+    value?: { captcha?: { enabled?: boolean } };
+}>("settings");
 const isProduction = process.env.NODE_ENV === "production";
 const authUrl = process.env.BETTER_AUTH_URL ?? "http://localhost:3000";
 const cookieDomain = process.env.AUTH_COOKIE_DOMAIN ?? process.env.NEXT_PUBLIC_COOKIE_DOMAIN;
@@ -30,6 +37,54 @@ const trustedOrigins = (
     .split(",")
     .map((origin) => origin.trim())
     .filter(Boolean);
+const turnstileHostnames = (process.env.TURNSTILE_HOSTNAMES ?? "")
+    .split(",")
+    .map((hostname) => hostname.trim())
+    .filter(Boolean);
+
+if (turnstileHostnames.length === 0) {
+    throw new Error("TURNSTILE_HOSTNAMES must contain at least one hostname");
+}
+
+const captchaEndpoints = [
+    "/sign-in/email",
+    "/sign-in/username",
+    "/sign-up/email",
+    "/request-password-reset",
+    "/two-factor/verify-totp",
+    "/two-factor/verify-backup-code",
+];
+const turnstileCaptcha = captcha({
+    provider: "cloudflare-turnstile",
+    secretKey: process.env.TURNSTILE_SECRET_KEY!,
+    expectedAction: "auth",
+    allowedHostnames: turnstileHostnames,
+    endpoints: captchaEndpoints,
+});
+const conditionalTurnstileCaptcha = {
+    ...turnstileCaptcha,
+    onRequest: async (
+        request: Parameters<typeof turnstileCaptcha.onRequest>[0],
+        ctx: Parameters<typeof turnstileCaptcha.onRequest>[1],
+    ) => {
+        const pathname = new URL(request.url).pathname;
+        if (!captchaEndpoints.some((endpoint) => pathname.endsWith(endpoint))) {
+            return;
+        }
+
+        const authSetting = await settings.findOne(
+            { name: "auth_setting" },
+            { projection: { "value.captcha.enabled": 1 } },
+        );
+        const captchaEnabled = authSetting?.value?.captcha?.enabled
+            ?? DEFAULT_AUTH_SETTING.captcha.enabled;
+        if (!captchaEnabled) {
+            return;
+        }
+
+        return turnstileCaptcha.onRequest(request, ctx);
+    },
+};
 
 export const auth = betterAuth({
     baseURL: authUrl,
@@ -40,6 +95,7 @@ export const auth = betterAuth({
         max: 100,
         customRules: {
             "/sign-in/email": { window: 10, max: 3 },
+            "/sign-in/username": { window: 10, max: 3 },
             "/sign-up/email": { window: 60, max: 3 },
             "/request-password-reset": { window: 60, max: 3 },
         },
@@ -49,6 +105,13 @@ export const auth = betterAuth({
     appName: process.env.AUTH_APP_NAME ?? "VDOHide",
     trustedOrigins,
     plugins: [
+        username({
+            displayUsername: false,
+            minUsernameLength: 3,
+            maxUsernameLength: 30,
+            usernameValidator: (value) => /^[a-zA-Z0-9]+$/.test(value),
+            usernameNormalization: normalizeUsername,
+        }),
         twoFactor({
             issuer: process.env.AUTH_APP_NAME ?? "VDOHide",
             otpOptions: {
@@ -64,11 +127,7 @@ export const auth = betterAuth({
             expiresIn: 300, // 5 นาที
             disableSignUp: true,
         }),
-        captcha({
-            provider: "cloudflare-turnstile",
-            secretKey: process.env.TURNSTILE_SECRET_KEY!,
-            endpoints: ["/sign-in/email", "/sign-up/email", "/request-password-reset", "/two-factor/verify-totp", "/two-factor/verify-backup-code"],
-        }),
+        conditionalTurnstileCaptcha,
         customSession(async ({ user, session }) => {
             const userWithRole = user as User;
 
@@ -218,7 +277,9 @@ export const auth = betterAuth({
 
                     let provider: string = 'unknown';
                     // ตรวจสอบ path เพื่อระบุ provider
-                    if (pathname.includes('/sign-in/email') || pathname.includes('/sign-up/email')) {
+                    if (pathname.includes('/sign-in/username')) {
+                        provider = 'username';
+                    } else if (pathname.includes('/sign-in/email') || pathname.includes('/sign-up/email')) {
                         provider = 'email';
                     } else if (pathname.includes('/callback/')) {
                         // /callback/google, /callback/github, etc.
@@ -260,12 +321,17 @@ export const auth = betterAuth({
             create: {
                 before: async (user, ctx) => {
                     const country = (ctx!.request?.headers?.get('cf-ipcountry') || ctx!.request?.headers?.get('x-vercel-ip-country') || 'unknown').toLowerCase();
+                    const requestedUsername = "username" in user && typeof user.username === "string"
+                        ? normalizeUsername(user.username)
+                        : "";
+                    const username = requestedUsername || await findAvailableUsername(user.email, user.id);
 
                     return {
                         data: {
                             ...user,
                             role: "user", // กำหนด role เป็น USER เสมอสำหรับผู้ใช้ใหม่
-                            country: country
+                            country: country,
+                            username,
                         },
                     };
                 },
@@ -322,3 +388,21 @@ export const auth = betterAuth({
         },
     },
 });
+
+async function findAvailableUsername(email: string, userId?: string): Promise<string> {
+    const base = usernameFromEmail(email);
+    const seed = normalizeUsername(userId ?? uuidv4()).slice(-8) || "user";
+
+    for (let attempt = 0; attempt < 100; attempt += 1) {
+        const suffix = attempt === 0 ? "" : `${seed}${attempt > 1 ? attempt : ""}`;
+        const candidate = `${base.slice(0, 30 - suffix.length)}${suffix}`;
+        const existing = await users.findOne(
+            { username: candidate },
+            { projection: { _id: 1 } },
+        );
+
+        if (!existing) return candidate;
+    }
+
+    throw new Error("Unable to generate an available username");
+}

@@ -16,6 +16,7 @@
     "typescript": "^5"
   },
   "exports": {
+    "./config": "./src/config/index.ts",
     "./enums": "./src/enums/index.ts",
     "./utils": "./src/utils/index.ts",
     "./validators": "./src/validators/index.ts"

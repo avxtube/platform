@@ -8,6 +8,7 @@
     "AUTH_*",
     "CORS_*",
     "API_INTERNAL_URL",
+    "API_VERSION",
     "HTTP_PORT",
     "TURNSTILE_*",
     "GITHUB_*",

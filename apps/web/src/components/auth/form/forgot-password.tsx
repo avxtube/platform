@@ -4,7 +4,7 @@ import { EmailValid, EmailValidInfer } from "@workspace/core/validators";
 import { cn } from "@workspace/ui/lib/utils";
 import { MailIcon } from "lucide-react";
 import { authClient } from "@workspace/auth/client";
-import { Turnstile } from "@marsidev/react-turnstile";
+import { Turnstile, type TurnstileInstance } from "@marsidev/react-turnstile";
 import { useRef, useState } from "react";
 import { Field, FieldError, FieldGroup, FieldLabel, Input } from "@workspace/ui/components";
 import { SubmitButton } from "@workspace/ui/components";
@@ -12,13 +12,23 @@ import { useRouter } from "@/i18n/navigation";
 import { Controller, useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { toast } from "sonner";
+import { authTurnstileOptions } from "@/components/auth/turnstile-options";
+import { useTranslations } from "next-intl";
 
 const TURNSTILE_SITE_KEY = process.env.NEXT_PUBLIC_TURNSTILE_SITE_KEY || "";
 
-export const ForgotPasswordForm = ({ className }: { className?: string }) => {
+export const ForgotPasswordForm = ({
+    className,
+    captchaEnabled = true,
+}: {
+    className?: string;
+    captchaEnabled?: boolean;
+}) => {
     const [captchaToken, setCaptchaToken] = useState<string | null>(null);
-    const turnstileRef = useRef<any>(null);
+    const turnstileRef = useRef<TurnstileInstance | null>(null);
     const router = useRouter();
+    const t = useTranslations("auth");
+    const showCaptcha = captchaEnabled && Boolean(TURNSTILE_SITE_KEY);
 
     const form = useForm<EmailValidInfer>({
         resolver: zodResolver(EmailValid),
@@ -28,12 +38,12 @@ export const ForgotPasswordForm = ({ className }: { className?: string }) => {
     })
 
     const onSubmit = async (values: EmailValidInfer) => {
-        if (!!TURNSTILE_SITE_KEY && !captchaToken) {
-            toast.error("Please verify you are not a robot");
+        if (showCaptcha && !captchaToken) {
+            toast.error(t("message.captchaRequired"));
             return;
         }
 
-        const toastId = toast.loading("Loading...");
+        const toastId = toast.loading(t("forgotPassword.sending"));
         try {
             const { error } = await authClient.requestPasswordReset({
                 email: values.email,
@@ -49,11 +59,11 @@ export const ForgotPasswordForm = ({ className }: { className?: string }) => {
                 setCaptchaToken(null);
                 turnstileRef.current?.reset();
             } else {
-                toast.success("If an account exists with this email, you will receive a password reset link shortly.", { id: toastId, richColors: true });
+                toast.success(t("forgotPassword.sent"), { id: toastId, richColors: true });
                 router.push(`/verify-email?from=forgot-password`);
             }
         } catch (error) {
-            const errorMessage = error instanceof Error ? error.message : "Unexpected error occurred. Please try again.";
+            const errorMessage = error instanceof Error ? error.message : t("message.unexpectedError");
             toast.error(errorMessage, { id: toastId, richColors: true });
             setCaptchaToken(null);
             turnstileRef.current?.reset();
@@ -71,16 +81,16 @@ export const ForgotPasswordForm = ({ className }: { className?: string }) => {
                     control={form.control}
                     render={({ field, fieldState }) => (
                         <Field>
-                            <FieldLabel htmlFor={field.name}>Email</FieldLabel>
+                            <FieldLabel htmlFor={field.name}>{t("field.email")}</FieldLabel>
                             <Input
                                 {...field}
                                 id={field.name}
-                                placeholder="Enter your email"
+                                placeholder={t("field.emailPlaceholder")}
                                 type="email"
                                 disabled={form.formState.isSubmitting}
                             />
                             {fieldState.invalid && (
-                                <FieldError errors={[fieldState.error]} />
+                                <FieldError errors={[{ ...fieldState.error, message: t(fieldState.error?.message ?? "invalid.email") }]} />
                             )}
                         </Field>
                     )}
@@ -88,7 +98,7 @@ export const ForgotPasswordForm = ({ className }: { className?: string }) => {
             </FieldGroup>
 
             {/* Cloudflare Turnstile CAPTCHA */}
-            {TURNSTILE_SITE_KEY && (
+            {showCaptcha && (
                 <div className="flex justify-center">
                     <Turnstile
                         ref={turnstileRef}
@@ -96,21 +106,18 @@ export const ForgotPasswordForm = ({ className }: { className?: string }) => {
                         onSuccess={(token) => setCaptchaToken(token)}
                         onError={() => setCaptchaToken(null)}
                         onExpire={() => setCaptchaToken(null)}
-                        options={{
-                            theme: "auto",
-                            size: "flexible",
-                        }}
+                        options={authTurnstileOptions}
                     />
                 </div>
             )}
 
             <SubmitButton
-                text="Send Reset Link"
-                textLoading="Sending..."
+                text={t("forgotPassword.sendResetLink")}
+                textLoading={t("forgotPassword.sending")}
                 icon={<MailIcon />}
                 showSpinner={true}
                 isSubmitting={form.formState.isSubmitting}
-                disabled={!form.formState.isValid || (!!TURNSTILE_SITE_KEY && !captchaToken)}
+                disabled={!form.formState.isValid || (showCaptcha && !captchaToken)}
                 className="w-full rounded-full"
             />
         </form>

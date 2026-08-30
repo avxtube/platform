@@ -14,21 +14,31 @@ import {
 import { ShieldCheckIcon } from "lucide-react";
 import { authClient } from "@workspace/auth/client";
 import { useSearchParams } from "next/navigation";
-import { Turnstile } from "@marsidev/react-turnstile";
+import { Turnstile, type TurnstileInstance } from "@marsidev/react-turnstile";
 import { useRef, useState } from "react";
 import { SubmitButton } from "@workspace/ui/components";
 import { Controller, useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { toast } from "sonner";
+import { authTurnstileOptions } from "@/components/auth/turnstile-options";
+import { useTranslations } from "next-intl";
 
 const TURNSTILE_SITE_KEY = process.env.NEXT_PUBLIC_TURNSTILE_SITE_KEY || "";
 
-export const TwoFactorVerifyForm = ({ className }: { className?: string }) => {
+export const TwoFactorVerifyForm = ({
+    className,
+    captchaEnabled = true,
+}: {
+    className?: string;
+    captchaEnabled?: boolean;
+}) => {
     const searchParams = useSearchParams();
     const callbackUrl = searchParams.get("callbackUrl");
     const [loading, setLoading] = useState<boolean>(false);
     const [captchaToken, setCaptchaToken] = useState<string | null>(null);
-    const turnstileRef = useRef<any>(null);
+    const turnstileRef = useRef<TurnstileInstance | null>(null);
+    const t = useTranslations("auth");
+    const showCaptcha = captchaEnabled && Boolean(TURNSTILE_SITE_KEY);
 
     const form = useForm<TwoFactorVerifyValues>({
         resolver: zodResolver(twoFactorVerifySchema),
@@ -45,12 +55,12 @@ export const TwoFactorVerifyForm = ({ className }: { className?: string }) => {
     }
 
     const onSubmit = async (values: TwoFactorVerifyValues) => {
-        if (!captchaToken) {
-            toast.error("Please verify you are not a robot");
+        if (showCaptcha && !captchaToken) {
+            toast.error(t("message.captchaRequired"));
             return;
         }
 
-        const toastId = toast.loading("Loading...");
+        const toastId = toast.loading(t("twoFactor.verifying"));
         try {
             const cleanedCode = values.code.trim();
 
@@ -81,14 +91,14 @@ export const TwoFactorVerifyForm = ({ className }: { className?: string }) => {
                 data = result.data;
                 error = result.error;
             } else {
-                error = { message: "Invalid verification code" };
+                error = { message: t("twoFactor.invalidCode") };
             }
             if (error) {
                 toast.error(error.message, { id: toastId, richColors: true });
                 setCaptchaToken(null);
                 turnstileRef.current?.reset();
             } else if (data) {
-                toast.success("Verification successful", { id: toastId, richColors: true });
+                toast.success(t("twoFactor.success"), { id: toastId, richColors: true });
                 let finalCallbackUrl = callbackUrl;
                 if (!finalCallbackUrl && typeof document !== "undefined") {
                     const match = document.cookie.match(/(^|;)\s*auth_callback_url\s*=\s*([^;]+)/);
@@ -100,7 +110,7 @@ export const TwoFactorVerifyForm = ({ className }: { className?: string }) => {
                 window.location.href = safeRedirectPath(finalCallbackUrl) || "/";
             }
         } catch (error) {
-            const errorMessage = error instanceof Error ? error.message : "Unexpected error occurred. Please try again.";
+            const errorMessage = error instanceof Error ? error.message : t("message.unexpectedError");
             toast.error(errorMessage, { id: toastId, richColors: true });
             setCaptchaToken(null);
             turnstileRef.current?.reset();
@@ -119,15 +129,15 @@ export const TwoFactorVerifyForm = ({ className }: { className?: string }) => {
                     control={form.control}
                     render={({ field, fieldState }) => (
                         <Field>
-                            <FieldLabel htmlFor={field.name}>Verification Code</FieldLabel>
+                            <FieldLabel htmlFor={field.name}>{t("twoFactor.code")}</FieldLabel>
                             <Input
                                 {...field}
                                 id={field.name}
-                                placeholder="Enter 6-digit code or backup code"
+                                placeholder={t("twoFactor.codePlaceholder")}
                                 disabled={form.formState.isSubmitting}
                             />
                             {fieldState.invalid && (
-                                <FieldError errors={[fieldState.error]} />
+                                <FieldError errors={[{ ...fieldState.error, message: t(fieldState.error?.message ?? "invalid.twoFactorCode") }]} />
                             )}
                         </Field>
                     )}
@@ -135,7 +145,7 @@ export const TwoFactorVerifyForm = ({ className }: { className?: string }) => {
             </FieldGroup>
 
             {/* Cloudflare Turnstile CAPTCHA */}
-            {TURNSTILE_SITE_KEY && (
+            {showCaptcha && (
                 <div className="flex justify-center">
                     <Turnstile
                         ref={turnstileRef}
@@ -143,21 +153,18 @@ export const TwoFactorVerifyForm = ({ className }: { className?: string }) => {
                         onSuccess={(token) => setCaptchaToken(token)}
                         onError={() => setCaptchaToken(null)}
                         onExpire={() => setCaptchaToken(null)}
-                        options={{
-                            theme: "auto",
-                            size: "flexible",
-                        }}
+                        options={authTurnstileOptions}
                     />
                 </div>
             )}
 
             <SubmitButton
-                text="Verify"
-                textLoading="Verifying..."
+                text={t("twoFactor.verify")}
+                textLoading={t("twoFactor.verifying")}
                 icon={<ShieldCheckIcon />}
                 showSpinner={true}
                 isSubmitting={form.formState.isSubmitting}
-                disabled={form.formState.isSubmitting || (!!TURNSTILE_SITE_KEY && !captchaToken)}
+                disabled={form.formState.isSubmitting || (showCaptcha && !captchaToken)}
                 className="w-full rounded-full"
             />
             <Button
@@ -167,7 +174,7 @@ export const TwoFactorVerifyForm = ({ className }: { className?: string }) => {
                 disabled={loading}
                 className="w-full"
             >
-                Cancel
+                {t("action.backToLogin")}
             </Button>
         </form>
     </>)

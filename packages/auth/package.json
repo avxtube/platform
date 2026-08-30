@@ -8,6 +8,7 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
+    "@workspace/core": "workspace:*",
     "better-auth": "^1.6.29",
     "mongodb": "7.6.0",
     "uuid": "catalog:",

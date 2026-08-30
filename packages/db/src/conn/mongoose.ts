@@ -9,6 +9,7 @@ g.__mongoose ??= { conn: null, promise: null };
 const cached = g.__mongoose;
 
 const baseOptions: ConnectOptions = {
+    autoIndex: false,
     bufferCommands: false,
     maxPoolSize: 20,
     minPoolSize: 2,

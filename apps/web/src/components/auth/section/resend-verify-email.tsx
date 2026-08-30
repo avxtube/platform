@@ -4,12 +4,16 @@ import React from "react"
 import { Button } from "@workspace/ui/components"
 import { authClient } from "@workspace/auth/client"
 import { toast } from "sonner";
+import { useLocale, useTranslations } from "next-intl";
+import { getPathname } from "@/i18n/navigation";
 
 interface ResendVerifyEmailProps {
     email?: string;
 }
 
 export function ResendVerifyEmail({ email }: ResendVerifyEmailProps) {
+    const locale = useLocale();
+    const t = useTranslations("auth");
     const [countdown, setCountdown] = React.useState(0);
     const [isSending, setIsSending] = React.useState(false);
 
@@ -24,18 +28,22 @@ export function ResendVerifyEmail({ email }: ResendVerifyEmailProps) {
 
         setIsSending(true);
         try {
-            await authClient.sendVerificationEmail({
+            const { error } = await authClient.sendVerificationEmail({
                 email,
-                callbackURL: "/",
+                callbackURL: getPathname({ locale, href: "/verify-email" }),
             });
+
+            if (error) {
+                throw new Error(error.message || t("verifyEmail.resendError"));
+            }
             toast.success(
-                "Verification email sent. Please check your inbox.",
+                t("verifyEmail.resendSuccess"),
                 { richColors: true }
             );
             setCountdown(60);
         } catch {
             toast.error(
-                "Failed to send verification email. Please try again.",
+                t("verifyEmail.resendError"),
                 { richColors: true }
             );
         } finally {
@@ -55,10 +63,10 @@ export function ResendVerifyEmail({ email }: ResendVerifyEmailProps) {
             onClick={handleResend}
         >
             {isSending
-                ? "Sending..."
+                ? t("verifyEmail.sending")
                 : countdown > 0
-                    ? `Resend in ${countdown}s`
-                    : "Didn't receive it? Resend"}
+                    ? t("verifyEmail.resendIn", { seconds: countdown })
+                    : t("verifyEmail.resend")}
         </Button>
     );
 }

@@ -12,7 +12,9 @@ export function selectClientMessages(messages: Messages) {
 
   return {
     shared: messages.shared,
-    web: messages.web,
+    auth: messages.auth,
+    common: messages.common,
+    page: messages.page,
     content: clientContent,
   }
 }

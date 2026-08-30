@@ -13,7 +13,7 @@ import { toast } from "sonner"
 import { getPathname } from "@/i18n/navigation"
 
 const DividerRender = () => {
-  const t = useTranslations()
+  const t = useTranslations("auth")
 
   return (
     <div className="relative mt-6">
@@ -22,7 +22,7 @@ const DividerRender = () => {
       </div>
       <div className="relative flex justify-center text-xs uppercase">
         <span className="bg-background px-2 text-muted-foreground">
-          {t("Or continue with")}
+          {t("social.divider")}
         </span>
       </div>
     </div>
@@ -47,7 +47,8 @@ export function SocialLoginButtons({
   signUp = false,
 }: FormSocialLoginProps) {
   const [loading, setLoading] = React.useState<string | null>(null)
-  const t = useTranslations()
+  const t = useTranslations("auth")
+  const common = useTranslations("common")
   const locale = useLocale()
   const searchParams = useSearchParams()
   const rawCallbackUrl = searchParams.get("callbackUrl")
@@ -77,17 +78,14 @@ export function SocialLoginButtons({
       if (error) {
         toast.error(
           error.message ||
-            t("Unable to sign in with {provider}.").replace(
-              "{provider}",
-              provider
-            )
+            t("social.signInError", { provider })
         )
         return
       }
 
       if (!data?.url) {
         toast.error(
-          t("Unable to start {provider} login.").replace("{provider}", provider)
+          t("social.startError", { provider })
         )
         return
       }
@@ -96,10 +94,7 @@ export function SocialLoginButtons({
     } catch (err) {
       console.error(`${provider} login error:`, err)
       toast.error(
-        t("Unable to connect to {provider}. Please try again.").replace(
-          "{provider}",
-          provider
-        )
+        t("social.connectionError", { provider })
       )
     } finally {
       setLoading(null)
@@ -134,7 +129,7 @@ export function SocialLoginButtons({
             className="w-full rounded-full"
           >
             {/* <GithubIcon className="size-4" /> */}
-            {loading === "github" ? t("Submitting...") : "GitHub"}
+            {loading === "github" ? common("submitting") : "GitHub"}
           </Button>
         )}
         {google && (
@@ -145,7 +140,7 @@ export function SocialLoginButtons({
             className="w-full rounded-full"
           >
             {/* <GoogleIcon className="size-4" /> */}
-            {loading === "google" ? t("Submitting...") : "Google"}
+            {loading === "google" ? common("submitting") : "Google"}
           </Button>
         )}
         {facebook && (
@@ -156,7 +151,7 @@ export function SocialLoginButtons({
             className="w-full rounded-full"
           >
             {/* <FacebookIcon className="size-4" /> */}
-            {loading === "facebook" ? t("Submitting...") : "Facebook"}
+            {loading === "facebook" ? common("submitting") : "Facebook"}
           </Button>
         )}
       </div>

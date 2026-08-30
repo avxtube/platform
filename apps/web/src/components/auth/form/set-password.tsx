@@ -10,9 +10,11 @@ import { SubmitButton } from "@workspace/ui/components";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { toast } from "sonner";
 import { Controller, useForm } from "react-hook-form";
+import { useTranslations } from "next-intl";
 
 export const SetPasswordForm = ({ token, className }: { token: string, className?: string }) => {
     const router = useRouter();
+    const t = useTranslations("auth");
 
     const form = useForm<SetPasswordValidInfer>({
         resolver: zodResolver(setPasswordSchema),
@@ -23,7 +25,7 @@ export const SetPasswordForm = ({ token, className }: { token: string, className
     })
 
     const onSubmit = async (values: SetPasswordValidInfer) => {
-        const toastId = toast.loading("Loading...");
+        const toastId = toast.loading(t("setPassword.resetting"));
         try {
             const { error } = await authClient.resetPassword({
                 newPassword: values.newPassword,
@@ -33,13 +35,13 @@ export const SetPasswordForm = ({ token, className }: { token: string, className
             if (error) {
                 toast.error(error.message, { id: toastId, richColors: true });
             } else {
-                toast.success("Password has been reset successfully. You can now login.", { id: toastId, richColors: true });
+                toast.success(t("setPassword.success"), { id: toastId, richColors: true });
                 setTimeout(() => {
                     router.push("/login");
                 }, 2000);
             }
         } catch (error) {
-            const errorMessage = error instanceof Error ? error.message : "Unexpected error occurred. Please try again.";
+            const errorMessage = error instanceof Error ? error.message : t("message.unexpectedError");
             toast.error(errorMessage, { id: toastId, richColors: true });
         }
     }
@@ -55,16 +57,16 @@ export const SetPasswordForm = ({ token, className }: { token: string, className
                     control={form.control}
                     render={({ field, fieldState }) => (
                         <Field>
-                            <FieldLabel htmlFor={field.name}>"New Password"</FieldLabel>
+                            <FieldLabel htmlFor={field.name}>{t("field.newPassword")}</FieldLabel>
                             <InputPassword
                                 {...field}
                                 id={field.name}
-                                placeholder={"Enter new password"}
+                                placeholder={t("field.newPasswordPlaceholder")}
                                 disabled={form.formState.isSubmitting}
                                 autoComplete="new-password"
                             />
                             {fieldState.invalid && (
-                                <FieldError errors={[fieldState.error]} />
+                                <FieldError errors={[{ ...fieldState.error, message: t(fieldState.error?.message ?? "required.password") }]} />
                             )}
                         </Field>
                     )}
@@ -75,16 +77,16 @@ export const SetPasswordForm = ({ token, className }: { token: string, className
                     control={form.control}
                     render={({ field, fieldState }) => (
                         <Field>
-                            <FieldLabel htmlFor={field.name}>{"Confirm Password"}</FieldLabel>
+                            <FieldLabel htmlFor={field.name}>{t("field.confirmPassword")}</FieldLabel>
                             <InputPassword
                                 {...field}
                                 id={field.name}
-                                placeholder={"Confirm new password"}
+                                placeholder={t("field.confirmNewPasswordPlaceholder")}
                                 disabled={form.formState.isSubmitting}
                                 autoComplete="new-password"
                             />
                             {fieldState.invalid && (
-                                <FieldError errors={[fieldState.error]} />
+                                <FieldError errors={[{ ...fieldState.error, message: t(fieldState.error?.message ?? "invalid.passwordMismatch") }]} />
                             )}
                         </Field>
                     )}
@@ -92,8 +94,8 @@ export const SetPasswordForm = ({ token, className }: { token: string, className
             </FieldGroup>
 
             <SubmitButton
-                text={"Reset Password"}
-                textLoading={"Resetting..."}
+                text={t("setPassword.reset")}
+                textLoading={t("setPassword.resetting")}
                 icon={<KeyRoundIcon />}
                 showSpinner={true}
                 isSubmitting={form.formState.isSubmitting}

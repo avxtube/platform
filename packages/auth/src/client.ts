@@ -1,5 +1,5 @@
 import { createAuthClient } from "better-auth/react"
-import { twoFactorClient, magicLinkClient, customSessionClient } from "better-auth/client/plugins"
+import { twoFactorClient, magicLinkClient, customSessionClient, usernameClient } from "better-auth/client/plugins"
 import type { auth } from "./config";
 
 export const authClient = createAuthClient({
@@ -15,6 +15,7 @@ export const authClient = createAuthClient({
             },
         }),
         magicLinkClient(),
+        usernameClient({ displayUsername: false }),
         customSessionClient<typeof auth>()
     ],
 })

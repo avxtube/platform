@@ -9,6 +9,7 @@ type AuthSessionResponse = {
     user?: {
         id?: string;
         email?: string;
+        username?: string;
         name?: string;
         image?: string | null;
         role?: string;
@@ -22,6 +23,7 @@ export interface CurrentUser {
     userId?: string;
     sessionId?: string;
     email?: string;
+    username?: string;
     name?: string;
     image?: string;
     role?: string;
@@ -57,6 +59,7 @@ export const getCurrentUser = cache(async (): Promise<CurrentUser> => {
             userId: session.user.id,
             sessionId: session.session?.id,
             email: session.user.email,
+            username: session.user.username,
             name: session.user.name,
             image: session.user.image ?? undefined,
             role: session.user.role
