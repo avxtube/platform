@@ -1,0 +1,60 @@
+name: Build & Release API
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    name: Build & Release API
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 10.33.4
+          run_install: false
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Typecheck API
+        run: pnpm --filter api typecheck
+
+      - name: Build API
+        run: pnpm --filter api build
+
+      - name: Create standalone API package
+        run: pnpm --filter api deploy --prod out/api
+
+      - name: Package release tarball
+        run: |
+          tar -czf "out/api-${{ github.ref_name }}.tar.gz" \
+            -C out/api \
+            dist node_modules package.json
+          sha256sum "out/api-${{ github.ref_name }}.tar.gz" \
+            > "out/api-${{ github.ref_name }}.tar.gz.sha256"
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          name: API Release ${{ github.ref_name }}
+          tag_name: ${{ github.ref_name }}
+          generate_release_notes: true
+          files: |
+            out/api-${{ github.ref_name }}.tar.gz
+            out/api-${{ github.ref_name }}.tar.gz.sha256
