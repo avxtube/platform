@@ -97,8 +97,13 @@ export function ViewerShell({ children }: { children: React.ReactNode }) {
     }
   }, [pathname, usesDrawer])
 
+  const watchNavbarVisible = watchHeaderVisible || drawerOpen
+
   return (
-    <div className="min-h-svh bg-background">
+    <div
+      className="min-h-svh bg-background"
+      style={isWatchPage ? { "--watch-player-top": watchNavbarVisible ? "4rem" : "0rem" } as React.CSSProperties : undefined}
+    >
       <div className={isShortsPage ? "hidden lg:block" : ""}><ViewerHeader watchMode={isWatchPage} mobileHidden={isWatchPage && !watchHeaderVisible && !drawerOpen} menuExpanded={usesDrawer ? drawerOpen : !sidebarCollapsed} onMenuToggle={toggleNavigation} /></div>
       {!isWatchPage && <ViewerSidebar collapsed={sidebarCollapsed} />}
       <ViewerDrawer open={drawerOpen} onClose={closeDrawer} />

@@ -57,16 +57,18 @@ export function WatchExperience({
     : null
 
   const player = (
-    <WatchPlayer
-      video={video}
-      theater={theater}
-      onTheater={toggleTheater}
-      playlist={
-        playlist && playlistIndex
-          ? { id: playlist.id, index: playlistIndex }
-          : null
-      }
-    />
+    <div className="sticky top-[var(--watch-player-top,4rem)] z-30 transition-[top] duration-200 lg:static">
+      <WatchPlayer
+        video={video}
+        theater={theater}
+        onTheater={toggleTheater}
+        playlist={
+          playlist && playlistIndex
+            ? { id: playlist.id, index: playlistIndex }
+            : null
+        }
+      />
+    </div>
   )
   const details = (
     <div className="px-3 sm:px-0">
@@ -211,8 +213,8 @@ export function WatchExperience({
       </div>
     )
   return (
-    <div className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_420px]">
-      <div>
+    <div className="xl:grid xl:grid-cols-[minmax(0,1fr)_420px] xl:gap-6">
+      <div className="contents xl:block">
         {player}
         {details}
       </div>

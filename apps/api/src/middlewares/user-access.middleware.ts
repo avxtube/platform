@@ -12,7 +12,9 @@ export type RequestActor = {
 type UserParams = { id: string };
 
 function isAdminRole(role: UserRoleType): boolean {
-    return role === UserRole.ADMIN || role === UserRole.SUPER_ADMIN;
+    return role === UserRole.ADMIN
+        || role === UserRole.SUPER_ADMIN
+        || role === UserRole.DEVELOPER;
 }
 
 function isUserRole(role: unknown): role is UserRoleType {

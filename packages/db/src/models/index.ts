@@ -10,5 +10,7 @@ export * from "./setting.model";
 // Channel
 export * from "./channel.model";
 export * from "./channel-profile.model";
-export * from "./video-cast.model";
 export * from "./subscription.model";
+
+// Content
+export * from "./content.model";

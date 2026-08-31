@@ -160,8 +160,10 @@ export async function searchContent(params: Record<string, string>): Promise<Sea
   return fetchJson<SearchResponse>(url);
 }
 
-export async function getHomeFeed(): Promise<HomeFeedResponse> {
-  return fetchJson<HomeFeedResponse>(new URL(`/${apiVersion}/home`, apiOrigin));
+export async function getHomeFeed(category = "all"): Promise<HomeFeedResponse> {
+  const url = new URL(`/${apiVersion}/home`, apiOrigin);
+  url.searchParams.set("category", category);
+  return fetchJson<HomeFeedResponse>(url);
 }
 
 export async function getPlaylist(id: string): Promise<Playlist | null> {

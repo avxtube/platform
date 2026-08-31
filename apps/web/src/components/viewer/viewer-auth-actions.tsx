@@ -1,7 +1,7 @@
 "use client"
 
 import * as React from "react"
-import { Bell, CircleUserRound, Plus } from "lucide-react"
+import { Bell, CircleUserRound, MoreVertical, Plus } from "lucide-react"
 import { useTranslations } from "next-intl"
 
 import { authClient } from "@workspace/auth/client"
@@ -13,10 +13,11 @@ import { useNotificationCenter } from "@/hooks/use-notification-center"
 
 import { ViewerAvatar } from "./viewer-avatar"
 import { ViewerCreateMenu } from "./viewer-create-menu"
+import { ViewerGuestMenu } from "./viewer-guest-menu"
 import { ViewerNotificationsMenu } from "./viewer-notifications-menu"
 import { ViewerProfileMenu } from "./viewer-profile-menu"
 
-type HeaderMenu = "create" | "notifications" | "profile"
+type HeaderMenu = "create" | "notifications" | "profile" | "guest"
 
 export function ViewerAuthActions() {
   const auth = useTranslations("auth")
@@ -46,7 +47,11 @@ export function ViewerAuthActions() {
 
   if (!session?.user) {
     return (
-      <div className="ml-auto flex min-w-0 items-center justify-end md:min-w-36">
+      <div className="ml-auto flex min-w-0 items-center justify-end gap-1 md:min-w-36">
+        <Popover open={openMenu === "guest"} onOpenChange={(open) => setMenuOpen("guest", open)}>
+          <PopoverTrigger type="button" aria-label={account("guestMenu")} className="flex size-9 items-center justify-center rounded-full hover:bg-muted"><MoreVertical className="size-5" /></PopoverTrigger>
+          <ViewerGuestMenu onSelect={closeMenus} />
+        </Popover>
         <Link
           href="/login"
           className={cn(

@@ -151,6 +151,7 @@ export type ChannelPost = {
 };
 
 export type HomeFeedResponse = {
+  categories: string[];
   videos: Video[];
   shorts: Short[];
   playlists: Playlist[];

@@ -81,6 +81,76 @@ importers:
         specifier: ^5
         version: 5.9.3
 
+  apps/admin:
+    dependencies:
+      '@hookform/resolvers':
+        specifier: 'catalog:'
+        version: 5.4.0(react-hook-form@7.81.0(react@19.2.7))
+      '@workspace/auth':
+        specifier: workspace:*
+        version: link:../../packages/auth
+      '@workspace/core':
+        specifier: workspace:*
+        version: link:../../packages/core
+      '@workspace/i18n':
+        specifier: workspace:*
+        version: link:../../packages/i18n
+      '@workspace/services':
+        specifier: workspace:*
+        version: link:../../packages/services
+      '@workspace/ui':
+        specifier: workspace:*
+        version: file:packages/ui(@date-fns/tz@1.5.0)(@types/react-dom@19.2.3(@types/react@19.2.15))(@types/react@19.2.15)(react-is@16.13.1)(typescript@5.9.3)
+      lucide-react:
+        specifier: ^1.31.0
+        version: 1.37.0(react@19.2.7)
+      next:
+        specifier: 'catalog:'
+        version: 16.3.3(@types/node@20.19.41)(react-dom@19.2.7(react@19.2.7))(react@19.2.7)
+      next-intl:
+        specifier: 4.13.6
+        version: 4.13.6(@swc/helpers@0.5.23)(next@16.3.3(@types/node@20.19.41)(react-dom@19.2.7(react@19.2.7))(react@19.2.7))(react@19.2.7)(typescript@5.9.3)
+      next-themes:
+        specifier: ^0.4.6
+        version: 0.4.6(patch_hash=9ab742790bc3284034400fc2d6422e596a9b3439e3dacdb030316992ec0bec6e)(react-dom@19.2.7(react@19.2.7))(react@19.2.7)
+      react:
+        specifier: 'catalog:'
+        version: 19.2.7
+      react-dom:
+        specifier: 'catalog:'
+        version: 19.2.7(react@19.2.7)
+      react-hook-form:
+        specifier: 'catalog:'
+        version: 7.81.0(react@19.2.7)
+      sonner:
+        specifier: 'catalog:'
+        version: 2.0.8(@types/react@19.2.15)(react-dom@19.2.7(react@19.2.7))(react@19.2.7)
+    devDependencies:
+      '@tailwindcss/postcss':
+        specifier: ^4
+        version: 4.3.0
+      '@types/node':
+        specifier: ^20
+        version: 20.19.41
+      '@types/react':
+        specifier: ^19
+        version: 19.2.15
+      '@types/react-dom':
+        specifier: ^19
+        version: 19.2.3(@types/react@19.2.15)
+      '@workspace/eslint-config':
+        specifier: workspace:^
+        version: link:../../packages/eslint-config
+      '@workspace/typescript-config':
+        specifier: workspace:*
+        version: link:../../packages/typescript-config
+      eslint:
+        specifier: ^9
+        version: 9.39.4(jiti@2.7.0)
+      typescript:
+        specifier: ^5
+        version: 5.9.3
+
   apps/api:
     dependencies:
       '@workspace/auth':

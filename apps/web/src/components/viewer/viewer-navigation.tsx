@@ -1,5 +1,6 @@
 "use client"
 
+import * as React from "react"
 import type { LucideIcon } from "lucide-react"
 import {
   CircleUserRound,
@@ -170,6 +171,11 @@ export function ViewerMobileNavigation() {
   const t = useTranslations("viewer.navigation")
   const isActive = useIsActive()
   const { data: session } = authClient.useSession()
+  const mounted = React.useSyncExternalStore(
+    React.useCallback(() => () => {}, []),
+    React.useCallback(() => true, []),
+    React.useCallback(() => false, [])
+  )
   const items = [primaryItems[0]!, primaryItems[1]!, primaryItems[3]!]
   const youActive = [viewerRoutes.library, viewerRoutes.history, viewerRoutes.watchLater, viewerRoutes.liked].some(isActive)
 
@@ -182,7 +188,7 @@ export function ViewerMobileNavigation() {
         </Link>
       ))}
       <Link href={viewerRoutes.library} aria-current={youActive ? "page" : undefined} className={`flex flex-col items-center justify-center gap-1 text-[10px] ${youActive ? "text-primary" : "text-muted-foreground"}`}>
-        {session?.user ? <ViewerAvatar user={session.user} className={`size-6 ${youActive ? "ring-2 ring-primary ring-offset-1 ring-offset-background" : ""}`} /> : <CircleUserRound className="size-5" />}
+        {mounted && session?.user ? <ViewerAvatar user={session.user} className={`size-6 ${youActive ? "ring-2 ring-primary ring-offset-1 ring-offset-background" : ""}`} /> : <CircleUserRound className="size-5" />}
         {t("you")}
       </Link>
     </nav>
