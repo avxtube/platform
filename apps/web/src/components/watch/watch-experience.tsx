@@ -2,12 +2,13 @@
 "use client"
 
 import type { Playlist, WatchData } from "@workspace/core/types"
-import { BadgeCheck, MessageCircle, X } from "lucide-react"
+import { BadgeCheck, LoaderCircle, MessageCircle, X } from "lucide-react"
 import { useTranslations } from "next-intl"
 import * as React from "react"
 
 import { FollowActorButton } from "@/components/actor/follow-actor-button"
 import { Link } from "@/i18n/navigation"
+import { useInfiniteLoad } from "@/hooks/use-infinite-load"
 import { useRelatedVideos } from "@/hooks/use-related-videos"
 
 import { VideoActions } from "./video-actions"
@@ -38,6 +39,12 @@ export function WatchExperience({
     data.relatedVideos,
     data.relatedNextCursor
   )
+  const relatedLoadMoreRef = useInfiniteLoad({
+    hasMore: related.hasMore,
+    loading: related.loading,
+    error: related.error,
+    loadMore: related.loadMore,
+  })
   const views = Intl.NumberFormat(locale, {
     notation: "compact",
     maximumFractionDigits: 1,
@@ -48,7 +55,9 @@ export function WatchExperience({
     year: "numeric",
     timeZone: "Asia/Bangkok",
   }).format(new Date(video.publishedAt))
-  const channelHref = `/channel/${video.channel.handle.replace(/^@/, "")}`
+  const channelHref = video.channel
+    ? `/channel/${video.channel.handle.replace(/^@/, "")}`
+    : null
   const playlistIndex = playlist
     ? Math.max(
         0,
@@ -76,29 +85,31 @@ export function WatchExperience({
         {video.title}
       </h1>
       <div className="mt-4 flex flex-col justify-between gap-4 lg:flex-row lg:items-center">
-        <div className="flex items-center gap-3">
-          <Link
-            href={channelHref}
-            className="flex size-10 shrink-0 items-center justify-center rounded-full bg-foreground text-xs font-bold text-background sm:size-11"
-          >
-            {initials(video.channel.name)}
-          </Link>
-          <div className="min-w-0">
+        {video.channel && channelHref ? (
+          <div className="flex items-center gap-3">
             <Link
               href={channelHref}
-              className="flex items-center gap-1 font-semibold hover:text-primary"
+              className="flex size-10 shrink-0 items-center justify-center rounded-full bg-foreground text-xs font-bold text-background sm:size-11"
             >
-              <span className="truncate">{video.channel.name}</span>
-              {video.channel.verified ? (
-                <BadgeCheck className="size-4 shrink-0" />
-              ) : null}
+              {initials(video.channel.name)}
             </Link>
-            <p className="text-xs text-muted-foreground">
-              {video.channel.handle}
-            </p>
+            <div className="min-w-0">
+              <Link
+                href={channelHref}
+                className="flex items-center gap-1 font-semibold hover:text-primary"
+              >
+                <span className="truncate">{video.channel.name}</span>
+                {video.channel.verified ? (
+                  <BadgeCheck className="size-4 shrink-0" />
+                ) : null}
+              </Link>
+              <p className="text-xs text-muted-foreground">
+                {video.channel.handle}
+              </p>
+            </div>
+            <FollowActorButton />
           </div>
-          <FollowActorButton />
-        </div>
+        ) : null}
         <VideoActions video={video} locale={locale} />
       </div>
       <div className="mt-5 rounded-xl bg-muted/60 p-4">
@@ -112,9 +123,57 @@ export function WatchExperience({
           {t("showMore")}
         </button>
       </div>
-      <button type="button" onClick={() => setMobileCommentsOpen(true)} className="mt-4 flex w-full items-center justify-between rounded-xl bg-muted/60 p-4 text-left sm:hidden"><span><strong>{t("comments", { count: data.comments.length })}</strong><span className="mt-1 block text-xs text-muted-foreground">{data.comments[0]?.message}</span></span><MessageCircle className="size-5 shrink-0" /></button>
-      <div className="hidden sm:block"><WatchComments videoId={video.id} initialComments={data.comments} initialNextCursor={data.commentsNextCursor} locale={locale} /></div>
-      {mobileCommentsOpen ? <div className="fixed inset-0 z-[80] bg-black/55 sm:hidden" onClick={() => setMobileCommentsOpen(false)}><section role="dialog" aria-modal="true" aria-label={t("comments", { count: data.comments.length })} onClick={(event) => event.stopPropagation()} className="absolute inset-x-0 bottom-0 max-h-[80svh] overflow-y-auto rounded-t-2xl bg-background p-4 text-foreground"><div className="mx-auto mb-3 h-1 w-10 rounded-full bg-muted-foreground/30" /><button type="button" onClick={() => setMobileCommentsOpen(false)} aria-label={t("shorts.close")} className="absolute top-3 right-3 rounded-full p-2 hover:bg-muted"><X className="size-5" /></button><WatchComments videoId={video.id} initialComments={data.comments} initialNextCursor={data.commentsNextCursor} locale={locale} /></section></div> : null}
+      <button
+        type="button"
+        onClick={() => setMobileCommentsOpen(true)}
+        className="mt-4 flex w-full items-center justify-between rounded-xl bg-muted/60 p-4 text-left sm:hidden"
+      >
+        <span>
+          <strong>{t("comments", { count: data.comments.length })}</strong>
+          <span className="mt-1 block text-xs text-muted-foreground">
+            {data.comments[0]?.message}
+          </span>
+        </span>
+        <MessageCircle className="size-5 shrink-0" />
+      </button>
+      <div className="hidden sm:block">
+        <WatchComments
+          videoId={video.id}
+          initialComments={data.comments}
+          initialNextCursor={data.commentsNextCursor}
+          locale={locale}
+        />
+      </div>
+      {mobileCommentsOpen ? (
+        <div
+          className="fixed inset-0 z-[80] bg-black/55 sm:hidden"
+          onClick={() => setMobileCommentsOpen(false)}
+        >
+          <section
+            role="dialog"
+            aria-modal="true"
+            aria-label={t("comments", { count: data.comments.length })}
+            onClick={(event) => event.stopPropagation()}
+            className="absolute inset-x-0 bottom-0 max-h-[80svh] overflow-y-auto rounded-t-2xl bg-background p-4 text-foreground"
+          >
+            <div className="mx-auto mb-3 h-1 w-10 rounded-full bg-muted-foreground/30" />
+            <button
+              type="button"
+              onClick={() => setMobileCommentsOpen(false)}
+              aria-label={t("shorts.close")}
+              className="absolute top-3 right-3 rounded-full p-2 hover:bg-muted"
+            >
+              <X className="size-5" />
+            </button>
+            <WatchComments
+              videoId={video.id}
+              initialComments={data.comments}
+              initialNextCursor={data.commentsNextCursor}
+              locale={locale}
+            />
+          </section>
+        </div>
+      ) : null}
     </div>
   )
   const next = (
@@ -165,9 +224,11 @@ export function WatchExperience({
               <h3 className="line-clamp-2 text-sm font-semibold">
                 {item.title}
               </h3>
-              <p className="mt-1 text-xs text-muted-foreground">
-                {item.channel.name}
-              </p>
+              {item.channel ? (
+                <p className="mt-1 text-xs text-muted-foreground">
+                  {item.channel.name}
+                </p>
+              ) : null}
               <p className="text-xs text-muted-foreground">
                 {t("views", {
                   count: Intl.NumberFormat(locale, {
@@ -179,26 +240,30 @@ export function WatchExperience({
           </Link>
         ))}
       </div>
-      {related.hasMore ? (
+      <div ref={relatedLoadMoreRef} aria-hidden="true" className="h-px" />
+      {related.loading ? (
+        <div
+          role="status"
+          className="mt-5 flex items-center justify-center gap-2 text-xs text-muted-foreground"
+        >
+          <LoaderCircle className="size-4 animate-spin" />
+          {t("loadingMore")}
+        </div>
+      ) : null}
+      {related.error ? (
         <button
           type="button"
-          disabled={related.loading}
           onClick={() => void related.loadMore()}
           className="mx-3 mt-5 w-[calc(100%-1.5rem)] rounded-full bg-muted px-4 py-2.5 text-sm font-semibold hover:bg-accent disabled:opacity-60 sm:mx-0 sm:w-full"
         >
-          {t(
-            related.loading
-              ? "loadingMore"
-              : related.error
-                ? "retry"
-                : "loadMore"
-          )}
+          {t("retry")}
         </button>
-      ) : (
+      ) : null}
+      {!related.hasMore ? (
         <p className="mt-5 text-center text-xs text-muted-foreground">
           {t("allLoaded")}
         </p>
-      )}
+      ) : null}
     </aside>
   )
 

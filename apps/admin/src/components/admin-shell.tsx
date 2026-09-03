@@ -3,16 +3,17 @@
 import * as React from "react"
 import {
   Clapperboard,
+  ChevronDown,
   ExternalLink,
   FileText,
+  HardDrive,
   Languages,
   LayoutDashboard,
-  Menu,
   Moon,
+  Plus,
   Radio,
   Sun,
   Video,
-  X,
 } from "lucide-react"
 import { useLocale, useTranslations } from "next-intl"
 import Link from "next/link"
@@ -24,7 +25,33 @@ import {
   localeCookieName,
   type Locale,
 } from "@workspace/i18n/config"
-import { Button, buttonVariants } from "@workspace/ui/components"
+import {
+  Avatar,
+  AvatarFallback,
+  Button,
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuGroup,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuTrigger,
+  Separator,
+  Sidebar,
+  SidebarContent,
+  SidebarFooter,
+  SidebarGroup,
+  SidebarGroupContent,
+  SidebarGroupLabel,
+  SidebarHeader,
+  SidebarInset,
+  SidebarMenu,
+  SidebarMenuButton,
+  SidebarMenuItem,
+  SidebarProvider,
+  SidebarRail,
+  SidebarTrigger,
+  useSidebar,
+} from "@workspace/ui/components"
 
 import { writeLocaleCookie } from "@/i18n/locale-cookie"
 
@@ -36,62 +63,191 @@ const navigation = [
   { href: "/contents/live", key: "live", icon: Radio },
 ] as const
 
+type AdminUser = { name?: string; email?: string; role?: string }
+
 export function AdminShell({
   children,
   user,
 }: {
   children: React.ReactNode
-  user: { name?: string; email?: string; role?: string }
+  user: AdminUser
 }) {
   const t = useTranslations("admin")
-  const pathname = usePathname()
-  const [open, setOpen] = React.useState(false)
-
-  const sidebar = (
-    <div className="flex h-full flex-col">
-      <Link href="/" onClick={() => setOpen(false)} className="flex h-16 items-center gap-3 border-b px-5">
-        <span className="flex size-9 items-center justify-center rounded-xl bg-primary text-primary-foreground">
-          <Video className="size-5" />
-        </span>
-        <span className="min-w-0">
-          <strong className="block truncate text-sm">{t("brand")}</strong>
-          <span className="block truncate text-xs text-muted-foreground">{t("adminDashboard")}</span>
-        </span>
-      </Link>
-      <nav className="flex-1 space-y-1 overflow-y-auto p-3">
-        {navigation.map(({ href, key, icon: Icon }, index) => {
-          const active = href === "/" ? pathname === "/" : pathname.startsWith(href)
-          return (
-            <React.Fragment key={href}>
-              {index === 1 ? <p className="px-3 pb-1 pt-4 text-xs font-semibold uppercase tracking-wider text-muted-foreground">{t("content")}</p> : null}
-              <Link href={href} onClick={() => setOpen(false)} className={`flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium transition-colors ${active ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:bg-muted hover:text-foreground"}`}>
-                <Icon className="size-[18px]" />
-                {key === "dashboard" ? t("dashboard") : t(`kinds.${key}`)}
-              </Link>
-            </React.Fragment>
-          )
-        })}
-      </nav>
-      <div className="border-t p-4">
-        <p className="truncate text-sm font-semibold">{user.name ?? user.email ?? "Admin"}</p>
-        <p className="mt-1 truncate text-xs text-muted-foreground">{t("role", { role: user.role ?? "-" })}</p>
-      </div>
-    </div>
-  )
 
   return (
-    <div className="min-h-svh bg-muted/25 lg:pl-64">
-      <aside className="fixed inset-y-0 left-0 z-40 hidden w-64 border-r bg-background lg:block">{sidebar}</aside>
-      {open ? <div className="fixed inset-0 z-50 lg:hidden"><button type="button" aria-label={t("closeMenu")} className="absolute inset-0 bg-black/50" onClick={() => setOpen(false)} /><aside className="absolute inset-y-0 left-0 w-[min(82vw,18rem)] bg-background shadow-2xl">{sidebar}<button type="button" aria-label={t("closeMenu")} onClick={() => setOpen(false)} className="absolute right-3 top-3 flex size-9 items-center justify-center rounded-full hover:bg-muted"><X className="size-5" /></button></aside></div> : null}
-      <header className="sticky top-0 z-30 flex h-16 items-center gap-3 border-b bg-background/95 px-4 backdrop-blur-xl sm:px-6">
-        <Button type="button" variant="ghost" size="icon" onClick={() => setOpen(true)} aria-label={t("menu")} className="lg:hidden"><Menu className="size-5" /></Button>
-        <div className="min-w-0 flex-1"><p className="truncate text-sm font-semibold">{t("adminDashboard")}</p></div>
-        <LanguageButton />
-        <ThemeButton />
-        <a href={process.env.NEXT_PUBLIC_WEB_URL ?? process.env.NEXT_PUBLIC_URL?.replace("://admin.", "://") ?? "http://localhost:3000"} target="_blank" rel="noreferrer" className={`${buttonVariants({ variant: "outline", size: "sm" })} hidden sm:inline-flex`}><ExternalLink className="size-4" />{t("openSite")}</a>
-      </header>
-      <main className="mx-auto w-full max-w-[1600px] p-4 sm:p-6 lg:p-8">{children}</main>
-    </div>
+    <SidebarProvider>
+      <AdminSidebar user={user} />
+      <SidebarInset className="min-w-0 bg-muted/25">
+        <header className="sticky top-0 z-30 flex h-16 shrink-0 items-center gap-2 border-b bg-background/95 px-4 backdrop-blur-xl sm:px-6">
+          <SidebarTrigger aria-label={t("menu")} />
+          <Separator orientation="vertical" className="mx-1 h-5!" />
+          <p className="min-w-0 flex-1 truncate text-sm font-semibold">
+            {t("adminDashboard")}
+          </p>
+          <CreateContentButton />
+          <LanguageButton />
+          <ThemeButton />
+          <Button
+            variant="outline"
+            size="sm"
+            nativeButton={false}
+            className="hidden sm:inline-flex"
+            render={
+              <a
+                href={
+                  process.env.NEXT_PUBLIC_WEB_URL ??
+                  process.env.NEXT_PUBLIC_URL?.replace("://admin.", "://") ??
+                  "http://localhost:3000"
+                }
+                target="_blank"
+                rel="noreferrer"
+              />
+            }
+          >
+            <ExternalLink />
+            {t("openSite")}
+          </Button>
+        </header>
+        <main className="mx-auto w-full max-w-[1600px] flex-1 p-4 sm:p-6 lg:p-8">
+          {children}
+        </main>
+      </SidebarInset>
+    </SidebarProvider>
+  )
+}
+
+function CreateContentButton() {
+  const t = useTranslations("admin")
+  const items = navigation.filter((item) => item.key !== "dashboard")
+
+  return (
+    <DropdownMenu>
+      <DropdownMenuTrigger
+        render={<Button type="button" size="sm" variant="outline" />}
+      >
+        <Plus />
+        <span className="hidden sm:inline">{t("createMenu")}</span>
+        <ChevronDown className="hidden size-3.5 sm:block" />
+      </DropdownMenuTrigger>
+      <DropdownMenuContent align="end" className="min-w-48">
+        <DropdownMenuGroup>
+          <DropdownMenuLabel>{t("createAction")}</DropdownMenuLabel>
+          {items.map(({ key, icon: Icon }) => (
+            <DropdownMenuItem
+              key={key}
+              render={<Link href={`/contents/${key}/new`} />}
+            >
+              <Icon />
+              {t(`kindSingular.${key}`)}
+            </DropdownMenuItem>
+          ))}
+        </DropdownMenuGroup>
+      </DropdownMenuContent>
+    </DropdownMenu>
+  )
+}
+
+function AdminSidebar({ user }: { user: AdminUser }) {
+  const t = useTranslations("admin")
+  const pathname = usePathname()
+  const { isMobile, setOpenMobile } = useSidebar()
+  const userLabel = user.name ?? user.email ?? "Admin"
+
+  const closeMobileSidebar = () => {
+    if (isMobile) setOpenMobile(false)
+  }
+
+  return (
+    <Sidebar collapsible="icon">
+      <SidebarHeader className="border-b p-2">
+        <SidebarMenu>
+          <SidebarMenuItem>
+            <SidebarMenuButton
+              size="lg"
+              tooltip={t("adminDashboard")}
+              render={<Link href="/" onClick={closeMobileSidebar} />}
+            >
+              <span className="flex aspect-square size-8 items-center justify-center rounded-lg bg-primary text-primary-foreground">
+                <Video className="size-4" />
+              </span>
+              <span className="grid min-w-0 flex-1 text-left text-sm leading-tight">
+                <span className="truncate font-semibold">{t("brand")}</span>
+                <span className="truncate text-xs text-muted-foreground">
+                  {t("adminDashboard")}
+                </span>
+              </span>
+            </SidebarMenuButton>
+          </SidebarMenuItem>
+        </SidebarMenu>
+      </SidebarHeader>
+
+      <SidebarContent>
+        <SidebarGroup>
+          <SidebarGroupLabel>{t("content")}</SidebarGroupLabel>
+          <SidebarGroupContent>
+            <SidebarMenu>
+              {navigation.map(({ href, key, icon: Icon }) => {
+                const active =
+                  href === "/" ? pathname === "/" : pathname.startsWith(href)
+                const label =
+                  key === "dashboard" ? t("dashboard") : t(`kinds.${key}`)
+
+                return (
+                  <SidebarMenuItem key={href}>
+                    <SidebarMenuButton
+                      isActive={active}
+                      tooltip={label}
+                      render={<Link href={href} onClick={closeMobileSidebar} />}
+                    >
+                      <Icon />
+                      <span>{label}</span>
+                    </SidebarMenuButton>
+                  </SidebarMenuItem>
+                )
+              })}
+            </SidebarMenu>
+          </SidebarGroupContent>
+        </SidebarGroup>
+        <SidebarGroup>
+          <SidebarGroupLabel>{t("infrastructure")}</SidebarGroupLabel>
+          <SidebarGroupContent>
+            <SidebarMenu>
+              <SidebarMenuItem>
+                <SidebarMenuButton
+                  isActive={pathname.startsWith("/storage")}
+                  tooltip={t("storage.title")}
+                  render={<Link href="/storage" onClick={closeMobileSidebar} />}
+                >
+                  <HardDrive />
+                  <span>{t("storage.title")}</span>
+                </SidebarMenuButton>
+              </SidebarMenuItem>
+            </SidebarMenu>
+          </SidebarGroupContent>
+        </SidebarGroup>
+      </SidebarContent>
+
+      <SidebarFooter className="border-t">
+        <SidebarMenu>
+          <SidebarMenuItem>
+            <SidebarMenuButton size="lg" tooltip={userLabel}>
+              <Avatar className="size-8 rounded-lg">
+                <AvatarFallback className="rounded-lg font-semibold">
+                  {initials(userLabel)}
+                </AvatarFallback>
+              </Avatar>
+              <span className="grid min-w-0 flex-1 text-left text-sm leading-tight">
+                <span className="truncate font-semibold">{userLabel}</span>
+                <span className="truncate text-xs text-muted-foreground">
+                  {t("role", { role: user.role ?? "-" })}
+                </span>
+              </span>
+            </SidebarMenuButton>
+          </SidebarMenuItem>
+        </SidebarMenu>
+      </SidebarFooter>
+      <SidebarRail />
+    </Sidebar>
   )
 }
 
@@ -101,14 +257,51 @@ function LanguageButton() {
   const router = useRouter()
   const nextLocale: Locale = locale === "th" ? "en" : "th"
 
-  return <Button type="button" variant="ghost" size="sm" aria-label={t("language")} onClick={() => { writeLocaleCookie(localeCookieName, nextLocale, localeCookieMaxAge); router.refresh() }}><Languages className="size-4" /><span className="hidden sm:inline">{nextLocale.toUpperCase()}</span></Button>
+  return (
+    <Button
+      type="button"
+      variant="ghost"
+      size="sm"
+      aria-label={t("language")}
+      onClick={() => {
+        writeLocaleCookie(localeCookieName, nextLocale, localeCookieMaxAge)
+        router.refresh()
+      }}
+    >
+      <Languages />
+      <span className="hidden sm:inline">{nextLocale.toUpperCase()}</span>
+    </Button>
+  )
 }
 
 function ThemeButton() {
   const t = useTranslations("admin")
   const { resolvedTheme, setTheme } = useTheme()
-  const mounted = React.useSyncExternalStore(React.useCallback(() => () => {}, []), React.useCallback(() => true, []), React.useCallback(() => false, []))
+  const mounted = React.useSyncExternalStore(
+    React.useCallback(() => () => {}, []),
+    React.useCallback(() => true, []),
+    React.useCallback(() => false, [])
+  )
   const dark = mounted && resolvedTheme === "dark"
 
-  return <Button type="button" variant="ghost" size="icon" aria-label={t("theme")} onClick={() => setTheme(dark ? "light" : "dark")}>{dark ? <Sun className="size-5" /> : <Moon className="size-5" />}</Button>
+  return (
+    <Button
+      type="button"
+      variant="ghost"
+      size="icon"
+      aria-label={t("theme")}
+      onClick={() => setTheme(dark ? "light" : "dark")}
+    >
+      {dark ? <Sun /> : <Moon />}
+    </Button>
+  )
+}
+
+function initials(value: string) {
+  return value
+    .split(/\s+/)
+    .map((part) => part[0])
+    .join("")
+    .slice(0, 2)
+    .toUpperCase()
 }

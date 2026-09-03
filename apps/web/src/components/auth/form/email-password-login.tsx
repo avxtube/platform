@@ -19,13 +19,14 @@ import {
   InputPassword,
   SubmitButton,
 } from "@workspace/ui/components"
-import { safeRedirectPath } from "@workspace/core/utils"
+import { safeRedirectUrl } from "@workspace/core/utils"
 import { LoginFormValues, loginSchema } from "@workspace/core/validators"
 import { useTranslations } from "next-intl"
 import { authTurnstileOptions } from "@/components/auth/turnstile-options"
 
 
 const TURNSTILE_SITE_KEY = process.env.NEXT_PUBLIC_TURNSTILE_SITE_KEY || ""
+const COOKIE_DOMAIN = process.env.NEXT_PUBLIC_COOKIE_DOMAIN
 
 export const EmailPasswordLogin = ({
   className,
@@ -98,7 +99,9 @@ export const EmailPasswordLogin = ({
             id: toastId,
             richColors: true,
           })
-          router.push(safeRedirectPath(callbackUrl) || "/")
+          const redirectTarget = safeRedirectUrl(callbackUrl, COOKIE_DOMAIN) || "/"
+          if (redirectTarget.startsWith("/")) router.push(redirectTarget)
+          else window.location.assign(redirectTarget)
         }
       }
     } catch (error) {

@@ -8,11 +8,13 @@ export type AdminContent = {
   visibility: "public" | "unlisted" | "private"
   moderationStatus: "active" | "suspended"
   title?: string
+  slug?: string
   description?: string
   studioId?: string
   termIds?: string[]
   actorIds?: string[]
   metadata?: Record<string, unknown>
+  relations?: ContentRelations
   seo?: {
     metaTitle?: string
     metaDescription?: string
@@ -23,6 +25,12 @@ export type AdminContent = {
   createdAt: string
   updatedAt: string
   createdBy: string
+}
+
+export type ContentRelations = {
+  channels: Array<{ id: string; name: string; handle: string; avatarUrl: string | null; kind: "actor" | "studio" }>
+  terms: Array<{ id: string; name: string; slug: string; taxonomy: "category" | "tag" }>
+  contents: Array<{ id: string; title: string; slug: string; kind: "video" }>
 }
 
 export type ContentListResponse = {

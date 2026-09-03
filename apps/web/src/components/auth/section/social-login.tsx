@@ -7,10 +7,12 @@ import { Button, Separator } from "@workspace/ui/components"
 import { cn } from "@workspace/ui/lib/utils"
 import { authClient } from "@workspace/auth/client"
 // import { FacebookIcon, GithubIcon, GoogleIcon } from "@workspace/ui/components";
-import { safeRedirectPath } from "@workspace/core/utils"
+import { safeRedirectUrl } from "@workspace/core/utils"
 import { toast } from "sonner"
 
 import { getPathname } from "@/i18n/navigation"
+
+const COOKIE_DOMAIN = process.env.NEXT_PUBLIC_COOKIE_DOMAIN
 
 const DividerRender = () => {
   const t = useTranslations("auth")
@@ -60,7 +62,7 @@ export function SocialLoginButtons({
   ) => {
     setLoading(provider)
     try {
-      const safeCallbackUrl = safeRedirectPath(rawCallbackUrl)
+      const safeCallbackUrl = safeRedirectUrl(rawCallbackUrl, COOKIE_DOMAIN)
       const defaultCallbackUrl = getPathname({ locale, href: "/" })
       const errorPath = getPathname({ locale, href: "/error" })
       if (safeCallbackUrl) {

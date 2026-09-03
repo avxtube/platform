@@ -1,7 +1,7 @@
 "use client";
 
 import { twoFactorVerifySchema, TwoFactorVerifyValues } from "@workspace/core/validators";
-import { safeRedirectPath } from "@workspace/core/utils";
+import { safeRedirectUrl } from "@workspace/core/utils";
 import { cn } from "@workspace/ui/lib/utils";
 import {
     Button,
@@ -24,6 +24,7 @@ import { authTurnstileOptions } from "@/components/auth/turnstile-options";
 import { useTranslations } from "next-intl";
 
 const TURNSTILE_SITE_KEY = process.env.NEXT_PUBLIC_TURNSTILE_SITE_KEY || "";
+const COOKIE_DOMAIN = process.env.NEXT_PUBLIC_COOKIE_DOMAIN;
 
 export const TwoFactorVerifyForm = ({
     className,
@@ -107,7 +108,7 @@ export const TwoFactorVerifyForm = ({
                 if (typeof document !== "undefined") {
                     document.cookie = "auth_callback_url=; Max-Age=0; path=/;";
                 }
-                window.location.href = safeRedirectPath(finalCallbackUrl) || "/";
+                window.location.href = safeRedirectUrl(finalCallbackUrl, COOKIE_DOMAIN) || "/";
             }
         } catch (error) {
             const errorMessage = error instanceof Error ? error.message : t("message.unexpectedError");

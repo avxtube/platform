@@ -1,67 +1,367 @@
 "use client"
 
 import * as React from "react"
-import { ArrowLeft, Braces, Save, Search, Send } from "lucide-react"
-import { useTranslations } from "next-intl"
+import { ArrowLeft, Link2, Save, Send, SlidersHorizontal } from "lucide-react"
+import { useLocale, useTranslations } from "next-intl"
 import Link from "next/link"
 import { useRouter } from "next/navigation"
 
-import { Button, Input, Label, Textarea, buttonVariants } from "@workspace/ui/components"
+import {
+  Button,
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+  Input,
+  Label,
+  RichTextEditor,
+  Sheet,
+  SheetContent,
+  SheetDescription,
+  SheetHeader,
+  SheetTitle,
+  Textarea,
+  buttonVariants,
+} from "@workspace/ui/components"
+import {
+  getMetadataLabel,
+  splitMetadata,
+  validateMetadata,
+} from "@workspace/metadata"
+import {
+  commitPendingMedia,
+  isPendingMediaToken,
+  preparePendingImageFromUrl,
+  preparePendingVideoFromUrl,
+  preparePendingVideoImport,
+  type PendingMediaSelection,
+} from "@workspace/media/react"
+import type { MediaUploadResult } from "@workspace/media"
 
+import { MetadataFields } from "@/components/metadata/fields"
+import {
+  collectPendingChannels,
+  replacePendingChannels,
+  type PendingChannel,
+} from "@/components/metadata/pending-channels"
+import {
+  collectPendingTerms,
+  type PendingTerm,
+} from "@/components/metadata/pending-terms"
+import { AdminMetabox } from "@/components/admin-metabox"
+import {
+  ContentImport,
+  importedNames,
+  type VideoImportResult,
+} from "@/components/content-import"
+import {
+  ContentMediaFields,
+  contentMediaFieldIds,
+} from "@/components/content-media-fields"
+import { createPendingChannelValue } from "@/components/metadata/pending-channels"
+import { createPendingTermValue } from "@/components/metadata/pending-terms"
 import type { AdminContent, ContentKind } from "@/lib/content"
 
-const statuses = ["draft", "processing", "scheduled", "published", "ended", "failed"] as const
+const statuses = [
+  "draft",
+  "processing",
+  "scheduled",
+  "published",
+  "ended",
+  "failed",
+] as const
 const visibilities = ["public", "unlisted", "private"] as const
 const moderationStatuses = ["active", "suspended"] as const
 
-export function ContentForm({ kind, content }: { kind: ContentKind; content?: AdminContent }) {
+export function ContentForm({
+  kind,
+  content,
+}: {
+  kind: ContentKind
+  content?: AdminContent
+}) {
   const t = useTranslations("admin")
+  const locale = useLocale()
   const router = useRouter()
   const [pending, setPending] = React.useState(false)
+  const [publishingOpen, setPublishingOpen] = React.useState(false)
   const [error, setError] = React.useState<string | null>(null)
-  const [metadata, setMetadata] = React.useState(() => JSON.stringify(content?.metadata ?? {}, null, 2))
+  const [confirmation, setConfirmation] = React.useState<{
+    payload: ContentPayload
+    channels: PendingChannel[]
+    terms: PendingTerm[]
+  } | null>(null)
+  const initialMetadata = React.useMemo(
+    () => splitMetadata(kind, content?.metadata ?? {}),
+    [content?.metadata, kind]
+  )
+  const [registeredMetadata, setRegisteredMetadata] = React.useState<
+    Record<string, unknown>
+  >(initialMetadata.registered)
+  const [pendingMedia, setPendingMedia] = React.useState<
+    Record<string, PendingMediaSelection>
+  >({})
+  const [mediaReferrerUrl, setMediaReferrerUrl] = React.useState<string>()
+  const pendingMediaRef = React.useRef(pendingMedia)
+  const committedMediaRef = React.useRef<Record<string, MediaUploadResult>>({})
+  const [customMetadata, setCustomMetadata] = React.useState(() =>
+    JSON.stringify(initialMetadata.custom, null, 2)
+  )
+  const [title, setTitle] = React.useState(content?.title ?? "")
+  const [slug, setSlug] = React.useState(content?.slug ?? "")
+  const [descriptionBody, setDescriptionBody] = React.useState(
+    content?.description ?? ""
+  )
+  const [status, setStatus] = React.useState(content?.status ?? "draft")
+  const [visibility, setVisibility] = React.useState(
+    content?.visibility ?? "private"
+  )
+  const [moderationStatus, setModerationStatus] = React.useState(
+    content?.moderationStatus ?? "active"
+  )
+  const [publishedAt, setPublishedAt] = React.useState(
+    localDate(content?.publishedAt)
+  )
+  const [scheduledAt, setScheduledAt] = React.useState(
+    localDate(content?.scheduledAt)
+  )
+  const slugManuallyEdited = React.useRef(Boolean(content?.slug))
+
+  pendingMediaRef.current = pendingMedia
+  React.useEffect(
+    () => () => {
+      Object.values(pendingMediaRef.current).forEach(releasePendingPreview)
+    },
+    []
+  )
 
   async function onSubmit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault()
     setError(null)
-    let metadataValue: Record<string, unknown>
+    let customMetadataValue: Record<string, unknown>
     try {
-      const parsed: unknown = JSON.parse(metadata || "{}")
-      if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) throw new Error()
-      metadataValue = parsed as Record<string, unknown>
+      const parsed: unknown = JSON.parse(customMetadata || "{}")
+      if (!parsed || typeof parsed !== "object" || Array.isArray(parsed))
+        throw new Error()
+      customMetadataValue = parsed as Record<string, unknown>
     } catch {
       setError(t("metadataInvalid"))
+      return
+    }
+
+    const customOnlyMetadata = splitMetadata(kind, customMetadataValue).custom
+    const metadataValue =
+      kind === "post" ? {} : { ...customOnlyMetadata, ...registeredMetadata }
+    const missingMetadataField = validateMetadata(kind, metadataValue)
+    if (missingMetadataField) {
+      setError(
+        t("metadataRequired", {
+          field: getMetadataLabel(missingMetadataField.label, locale),
+        })
+      )
       return
     }
 
     const form = new FormData(event.currentTarget)
     const payload = {
       kind,
-      title: nullableString(form.get("title")),
-      description: nullableString(form.get("description")),
-      status: String(form.get("status")),
-      visibility: String(form.get("visibility")),
-      moderationStatus: String(form.get("moderationStatus")),
-      publishedAt: isoDate(form.get("publishedAt")),
-      scheduledAt: isoDate(form.get("scheduledAt")),
+      title: nullableText(title),
+      slug: nullableText(slug),
+      description: nullableText(descriptionBody),
+      status,
+      visibility,
+      moderationStatus,
+      publishedAt: isoDate(publishedAt),
+      scheduledAt: isoDate(scheduledAt),
       metadata: metadataValue,
-      seo: {
-        metaTitle: nullableString(form.get("metaTitle")),
-        metaDescription: nullableString(form.get("metaDescription")),
-        keywords: String(form.get("keywords") ?? "").split(",").map((item) => item.trim()).filter(Boolean),
-      },
+      seo:
+        kind === "post"
+          ? {
+              metaTitle: content?.seo?.metaTitle ?? null,
+              metaDescription: content?.seo?.metaDescription ?? null,
+              keywords: content?.seo?.keywords ?? [],
+            }
+          : {
+              metaTitle: nullableString(form.get("metaTitle")),
+              metaDescription: nullableString(form.get("metaDescription")),
+              keywords: String(form.get("keywords") ?? "")
+                .split(",")
+                .map((item) => item.trim())
+                .filter(Boolean),
+            },
     }
 
+    const channels = collectPendingChannels(metadataValue)
+    const terms = collectPendingTerms(metadataValue)
+    if (channels.length || terms.length) {
+      setConfirmation({ payload, channels, terms })
+      return
+    }
+
+    await saveContent(payload)
+  }
+
+  async function applyImportedVideo(result: VideoImportResult) {
+    const data = result.data
+    const importedSourceUrl = cleanImportedUrl(
+      data.sourceUrl ?? result.url ?? ""
+    )
+    if (importedSourceUrl) setMediaReferrerUrl(importedSourceUrl)
+
+    const importedVideoUrl = cleanImportedUrl(data.m3u8Url ?? "")
+    const videoImportSource = importedSourceUrl || importedVideoUrl
+    let preparedVideo: PendingMediaSelection | undefined
+    if (videoImportSource) {
+      preparedVideo = preparePendingVideoImport({
+        sourceUrl: videoImportSource,
+        previewUrl: importedVideoUrl || videoImportSource,
+      })
+      const previousToken = registeredMetadata.sourceUrl
+      setPendingMedia((current) => {
+        const next = { ...current }
+        if (isPendingMediaToken(previousToken)) {
+          const previous = next[previousToken]
+          if (previous) releasePendingPreview(previous)
+          delete next[previousToken]
+        }
+        next[preparedVideo!.token] = preparedVideo!
+        return next
+      })
+    }
+
+    let preparedPoster: PendingMediaSelection | undefined
+    if (data.poster) {
+      const poster = await preparePendingImageFromUrl({
+        sourceUrl: cleanImportedUrl(data.poster),
+        purpose: "poster",
+        referrerUrl: importedSourceUrl || undefined,
+      })
+      preparedPoster = poster
+      const previousToken = registeredMetadata.thumbnailUrl
+      setPendingMedia((current) => {
+        const next = { ...current }
+        if (isPendingMediaToken(previousToken)) {
+          const previous = next[previousToken]
+          if (previous) releasePendingPreview(previous)
+          delete next[previousToken]
+        }
+        next[poster.token] = poster
+        return next
+      })
+    }
+    let preparedTrailer: PendingMediaSelection | undefined
+    if (data.trailer) {
+      preparedTrailer = await preparePendingVideoFromUrl({
+        sourceUrl: cleanImportedUrl(data.trailer),
+        referrerUrl: importedSourceUrl || undefined,
+      })
+      const previousToken = registeredMetadata.trailerUrl
+      setPendingMedia((current) => {
+        const next = { ...current }
+        if (isPendingMediaToken(previousToken)) {
+          const previous = next[previousToken]
+          if (previous) releasePendingPreview(previous)
+          delete next[previousToken]
+        }
+        next[preparedTrailer!.token] = preparedTrailer!
+        return next
+      })
+    }
+    if (data.title) setTitle(data.title)
+    if (data.slug || data.code) {
+      slugManuallyEdited.current = true
+      setSlug(toSlug(data.slug || data.code || ""))
+    }
+    if (data.content) setDescriptionBody(data.content)
+
+    const actors = importedNames(data.actresses)
+    const studios = importedNames(data.makers)
+    const categories = importedNames(data.genres)
+    const labels = importedNames(data.labels)
+    const directors = importedNames(data.directors)
+    setRegisteredMetadata((current) => ({
+      ...current,
+      ...(data.code ? { dvdId: data.code } : {}),
+      ...(data.releaseDate ? { releaseDate: data.releaseDate } : {}),
+      ...(typeof data.duration === "number"
+        ? { durationSeconds: data.duration }
+        : {}),
+      ...(preparedVideo
+        ? { sourceUrl: preparedVideo.token }
+        : importedVideoUrl
+          ? { sourceUrl: importedVideoUrl }
+          : {}),
+      ...(preparedPoster
+        ? { thumbnailUrl: preparedPoster.token }
+        : data.poster
+          ? { thumbnailUrl: cleanImportedUrl(data.poster) }
+          : {}),
+      ...(preparedTrailer ? { trailerUrl: preparedTrailer.token } : {}),
+      ...(studios[0]
+        ? { studioId: createPendingChannelValue("studio", studios[0]) }
+        : {}),
+      ...(actors.length
+        ? {
+            actorIds: actors.map((name) =>
+              createPendingChannelValue("actor", name)
+            ),
+          }
+        : {}),
+      ...(categories.length
+        ? {
+            categoryIds: categories.map((name) =>
+              createPendingTermValue("category", name)
+            ),
+          }
+        : {}),
+      ...(labels.length ? { label: labels.join(", ") } : {}),
+    }))
+
+    let existingCustom: Record<string, unknown> = {}
+    try {
+      const parsed: unknown = JSON.parse(customMetadata || "{}")
+      if (parsed && typeof parsed === "object" && !Array.isArray(parsed))
+        existingCustom = parsed as Record<string, unknown>
+    } catch {
+      // Keep the imported data usable even if the custom JSON was temporarily invalid.
+    }
+    setCustomMetadata(
+      JSON.stringify(
+        {
+          ...existingCustom,
+          ...(directors.length ? { directors } : {}),
+          import: {
+            sourceUrl: importedSourceUrl,
+            parser: result.parser ?? null,
+            importedAt: result.timestamp ?? new Date().toISOString(),
+          },
+        },
+        null,
+        2
+      )
+    )
+  }
+
+  async function saveContent(payload: ContentPayload) {
     setPending(true)
     try {
-      const url = content ? `/api/v1/admin/contents/${encodeURIComponent(content._id)}` : "/api/v1/admin/contents"
+      const metadata = await commitMediaInMetadata(payload.metadata)
+      const finalPayload = { ...payload, metadata }
+      const url = content
+        ? `/api/v1/admin/contents/${encodeURIComponent(content._id)}`
+        : "/api/v1/admin/contents"
       const response = await fetch(url, {
         method: content ? "PATCH" : "POST",
         headers: { "content-type": "application/json" },
-        body: JSON.stringify(payload),
+        body: JSON.stringify(finalPayload),
       })
       if (!response.ok) {
-        const body = await response.json().catch(() => null) as { message?: string; error?: string } | null
+        const body = (await response.json().catch(() => null)) as {
+          message?: string
+          error?: string
+        } | null
         throw new Error(body?.message ?? body?.error ?? t("saveFailed"))
       }
       router.push(`/contents/${kind}`)
@@ -73,47 +373,771 @@ export function ContentForm({ kind, content }: { kind: ContentKind; content?: Ad
     }
   }
 
+  async function commitMediaInMetadata(metadata: Record<string, unknown>) {
+    let resolvedMetadata = metadata
+    const trailerUrl = metadata.trailerUrl
+    if (isFourhoiUrl(trailerUrl)) {
+      const uploaded = await commitPendingMedia(
+        await preparePendingVideoFromUrl({
+          sourceUrl: trailerUrl,
+          referrerUrl: mediaReferrerUrl ?? "https://missav.ai/",
+        }),
+        { keySlug: slug }
+      )
+      resolvedMetadata = { ...resolvedMetadata, trailerUrl: uploaded.url }
+    }
+
+    const tokens = collectPendingMediaTokens(resolvedMetadata)
+    for (const token of tokens) {
+      const selection = pendingMediaRef.current[token]
+      if (!selection) throw new Error(t("media.pendingMissing"))
+      const uploaded =
+        committedMediaRef.current[token] ??
+        (await commitPendingMedia(selection, { keySlug: slug }))
+      committedMediaRef.current[token] = uploaded
+      resolvedMetadata = replacePendingMediaToken(
+        resolvedMetadata,
+        token,
+        uploaded.url
+      ) as Record<string, unknown>
+    }
+    if (tokens.length) {
+      setRegisteredMetadata((current) => {
+        let next: unknown = current
+        for (const token of tokens) {
+          const uploaded = committedMediaRef.current[token]
+          if (uploaded)
+            next = replacePendingMediaToken(next, token, uploaded.url)
+        }
+        return next as Record<string, unknown>
+      })
+      const remainingMedia = { ...pendingMediaRef.current }
+      for (const token of tokens) {
+        const selection = remainingMedia[token]
+        delete remainingMedia[token]
+        delete committedMediaRef.current[token]
+        if (selection) releasePendingPreview(selection)
+      }
+      pendingMediaRef.current = remainingMedia
+      setPendingMedia(remainingMedia)
+    }
+    return resolvedMetadata
+  }
+
+  async function confirmChannelsAndSave() {
+    if (!confirmation) return
+    setPending(true)
+    setError(null)
+
+    try {
+      const mediaMetadata = await commitMediaInMetadata(
+        confirmation.payload.metadata
+      )
+      const confirmedPayload = {
+        ...confirmation.payload,
+        metadata: mediaMetadata,
+      }
+      setConfirmation((current) =>
+        current ? { ...current, payload: confirmedPayload } : current
+      )
+
+      const resolved = new Map<string, string>()
+      if (confirmation.channels.length) {
+        const response = await fetch("/api/v1/admin/channels/resolve", {
+          method: "POST",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify({ channels: confirmation.channels }),
+        })
+        if (!response.ok) {
+          const errorBody = (await response.json().catch(() => null)) as {
+            message?: string
+            error?: string
+          } | null
+          throw new Error(
+            errorBody?.message ??
+              errorBody?.error ??
+              t("metadataRelationCreateFailed")
+          )
+        }
+        const body = (await response.json()) as {
+          channels: Array<{ key: string; id: string }>
+        }
+        body.channels.forEach((channel) =>
+          resolved.set(channel.key, channel.id)
+        )
+      }
+      if (confirmation.terms.length) {
+        const response = await fetch("/api/v1/admin/terms/resolve", {
+          method: "POST",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify({ terms: confirmation.terms }),
+        })
+        if (!response.ok) {
+          const errorBody = (await response.json().catch(() => null)) as {
+            message?: string
+            error?: string
+          } | null
+          throw new Error(
+            errorBody?.message ??
+              errorBody?.error ??
+              t("metadataRelationCreateFailed")
+          )
+        }
+        const body = (await response.json()) as {
+          terms: Array<{ key: string; id: string }>
+        }
+        body.terms.forEach((term) => resolved.set(term.key, term.id))
+      }
+      if (
+        [...confirmation.channels, ...confirmation.terms].some(
+          (item) => !resolved.has(item.key)
+        )
+      ) {
+        throw new Error(t("metadataRelationCreateFailed"))
+      }
+      const payload = {
+        ...confirmedPayload,
+        metadata: replacePendingChannels(
+          confirmedPayload.metadata,
+          resolved
+        ) as Record<string, unknown>,
+      }
+      setConfirmation(null)
+      await saveContent(payload)
+    } catch (reason) {
+      setError(
+        reason instanceof Error
+          ? reason.message
+          : t("metadataRelationCreateFailed")
+      )
+      setPending(false)
+    }
+  }
+
+  const mainMediaFieldIds =
+    kind === "video" ? ["sourceUrl"] : kind === "short" ? ["mediaUrl"] : []
+  const posterFieldIds =
+    kind === "video" || kind === "short"
+      ? ["thumbnailUrl"]
+      : kind === "live"
+        ? ["posterUrl"]
+        : []
+
+  function renderPublishingSidebar(idPrefix: string, formId?: string) {
+    return (
+      <div className="space-y-4">
+        <FormSection title={t("publishing")} compact>
+          <SelectField
+            id={`${idPrefix}-status`}
+            label={t("status")}
+            value={status}
+            onChange={(value) => setStatus(value as (typeof statuses)[number])}
+          >
+            {statuses.map((item) => (
+              <option key={item} value={item}>
+                {t(`statuses.${item}`)}
+              </option>
+            ))}
+          </SelectField>
+          <SelectField
+            id={`${idPrefix}-visibility`}
+            label={t("visibility")}
+            value={visibility}
+            onChange={(value) =>
+              setVisibility(value as (typeof visibilities)[number])
+            }
+          >
+            {visibilities.map((item) => (
+              <option key={item} value={item}>
+                {t(`visibilities.${item}`)}
+              </option>
+            ))}
+          </SelectField>
+          <SelectField
+            id={`${idPrefix}-moderation-status`}
+            label={t("moderationStatus")}
+            value={moderationStatus}
+            onChange={(value) =>
+              setModerationStatus(value as (typeof moderationStatuses)[number])
+            }
+          >
+            {moderationStatuses.map((item) => (
+              <option key={item} value={item}>
+                {t(`moderation.${item}`)}
+              </option>
+            ))}
+          </SelectField>
+          <Field label={t("publishedAt")} htmlFor={`${idPrefix}-published-at`}>
+            <Input
+              id={`${idPrefix}-published-at`}
+              type="datetime-local"
+              value={publishedAt}
+              onChange={(event) => setPublishedAt(event.target.value)}
+            />
+          </Field>
+          <Field label={t("scheduledAt")} htmlFor={`${idPrefix}-scheduled-at`}>
+            <Input
+              id={`${idPrefix}-scheduled-at`}
+              type="datetime-local"
+              value={scheduledAt}
+              onChange={(event) => setScheduledAt(event.target.value)}
+            />
+          </Field>
+          <SubmitButton
+            pending={pending}
+            editing={Boolean(content)}
+            className="w-full"
+            form={formId}
+          />
+        </FormSection>
+
+        {posterFieldIds.length ? (
+          <ContentMediaFields
+            kind={kind}
+            value={registeredMetadata}
+            onChange={setRegisteredMetadata}
+            pendingMedia={pendingMedia}
+            onPendingMediaChange={setPendingMedia}
+            referrerUrl={mediaReferrerUrl}
+            includeFieldIds={posterFieldIds}
+            title={t("media.poster")}
+            singleColumn
+            disabled={pending}
+          />
+        ) : null}
+
+        {kind === "video" ? (
+          <ContentMediaFields
+            kind={kind}
+            value={registeredMetadata}
+            onChange={setRegisteredMetadata}
+            pendingMedia={pendingMedia}
+            onPendingMediaChange={setPendingMedia}
+            referrerUrl={mediaReferrerUrl}
+            includeFieldIds={["trailerUrl"]}
+            title={t("media.trailer")}
+            singleColumn
+            disabled={pending}
+          />
+        ) : null}
+
+        {kind !== "short" && kind !== "post" ? (
+          <>
+            <MetadataFields
+              scope={kind}
+              value={registeredMetadata}
+              onChange={setRegisteredMetadata}
+              relationOptions={content?.relations}
+              disabled={pending}
+              variant="metabox"
+              includeFieldIds={["categoryIds"]}
+              title={t("metadataCategory")}
+            />
+            <MetadataFields
+              scope={kind}
+              value={registeredMetadata}
+              onChange={setRegisteredMetadata}
+              relationOptions={content?.relations}
+              disabled={pending}
+              variant="metabox"
+              includeFieldIds={["tagIds"]}
+              title={t("metadataTag")}
+            />
+          </>
+        ) : null}
+      </div>
+    )
+  }
+
   return (
-    <form onSubmit={onSubmit} className="space-y-6">
-      <div className="flex flex-col justify-between gap-4 sm:flex-row sm:items-end">
-        <div><p className="text-sm font-semibold text-primary">{t(`kinds.${kind}`)}</p><h1 className="mt-1 text-3xl font-bold tracking-tight">{t(content ? "edit" : "create", { kind: t(`kindSingular.${kind}`) })}</h1></div>
-        <div className="flex gap-2"><Link href={`/contents/${kind}`} className={buttonVariants({ variant: "outline" })}><ArrowLeft className="size-4" />{t("back")}</Link><Button type="submit" disabled={pending}>{pending ? <><span className="size-4 animate-spin rounded-full border-2 border-current border-t-transparent" />{t("saving")}</> : <>{content ? <Save className="size-4" /> : <Send className="size-4" />}{t(content ? "save" : "createAction")}</>}</Button></div>
-      </div>
-      {error ? <div role="alert" className="rounded-xl border border-destructive/30 bg-destructive/10 px-4 py-3 text-sm text-destructive">{error}</div> : null}
-      <div className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_360px]">
-        <div className="space-y-6">
-          <FormSection title={t("details")} icon={<Search className="size-5" />}>
-            <Field label={t("titleOptional")} htmlFor="title"><Input id="title" name="title" defaultValue={content?.title ?? ""} maxLength={1000} /></Field>
-            <Field label={t("description")} htmlFor="description"><Textarea id="description" name="description" defaultValue={content?.description ?? ""} rows={12} maxLength={20000} /></Field>
-          </FormSection>
-          <FormSection title={t("metadata")} icon={<Braces className="size-5" />}>
-            <p className="text-sm text-muted-foreground">{t("metadataHelp")}</p>
-            <Textarea aria-label={t("metadata")} value={metadata} onChange={(event) => setMetadata(event.target.value)} placeholder={metadataPlaceholder(kind)} rows={14} className="font-mono text-xs" spellCheck={false} />
-          </FormSection>
-          <FormSection title={t("seo")} icon={<Search className="size-5" />}>
-            <Field label={t("metaTitle")} htmlFor="metaTitle"><Input id="metaTitle" name="metaTitle" defaultValue={content?.seo?.metaTitle ?? ""} maxLength={300} /></Field>
-            <Field label={t("metaDescription")} htmlFor="metaDescription"><Textarea id="metaDescription" name="metaDescription" defaultValue={content?.seo?.metaDescription ?? ""} rows={4} maxLength={160} /></Field>
-            <Field label={t("keywords")} htmlFor="keywords"><Input id="keywords" name="keywords" defaultValue={content?.seo?.keywords?.join(", ") ?? ""} /></Field>
-          </FormSection>
+    <>
+      <form id="content-editor-form" onSubmit={onSubmit} className="space-y-5">
+        <div className="flex items-end justify-between gap-4">
+          <div>
+            <p className="text-sm font-semibold text-primary">
+              {t(`kinds.${kind}`)}
+            </p>
+            <h1 className="mt-1 text-3xl font-bold tracking-tight">
+              {t(content ? "edit" : "create", {
+                kind: t(`kindSingular.${kind}`),
+              })}
+            </h1>
+          </div>
+          <div className="flex gap-2">
+            <Link
+              href={`/contents/${kind}`}
+              className={buttonVariants({ variant: "outline" })}
+            >
+              <ArrowLeft className="size-4" />
+              {t("back")}
+            </Link>
+            <Button
+              type="button"
+              variant="outline"
+              className={kind === "post" ? "hidden" : "lg:hidden"}
+              onClick={() => setPublishingOpen(true)}
+            >
+              <SlidersHorizontal className="size-4" />
+              <span className="hidden sm:inline">{t("publishing")}</span>
+            </Button>
+            {kind === "post" ? (
+              <SubmitButton pending={pending} editing={Boolean(content)} />
+            ) : null}
+          </div>
         </div>
-        <div className="space-y-6">
-          <FormSection title={t("publishing")}>
-            <SelectField name="status" label={t("status")} defaultValue={content?.status ?? "draft"}>{statuses.map((item) => <option key={item} value={item}>{t(`statuses.${item}`)}</option>)}</SelectField>
-            <SelectField name="visibility" label={t("visibility")} defaultValue={content?.visibility ?? "private"}>{visibilities.map((item) => <option key={item} value={item}>{t(`visibilities.${item}`)}</option>)}</SelectField>
-            <SelectField name="moderationStatus" label={t("moderationStatus")} defaultValue={content?.moderationStatus ?? "active"}>{moderationStatuses.map((item) => <option key={item} value={item}>{t(`moderation.${item}`)}</option>)}</SelectField>
-            <Field label={t("publishedAt")} htmlFor="publishedAt"><Input id="publishedAt" name="publishedAt" type="datetime-local" defaultValue={localDate(content?.publishedAt)} /></Field>
-            <Field label={t("scheduledAt")} htmlFor="scheduledAt"><Input id="scheduledAt" name="scheduledAt" type="datetime-local" defaultValue={localDate(content?.scheduledAt)} /></Field>
-          </FormSection>
+        {error ? (
+          <div
+            role="alert"
+            className="rounded-xl border border-destructive/30 bg-destructive/10 px-4 py-3 text-sm text-destructive"
+          >
+            {error}
+          </div>
+        ) : null}
+        <div className="flex flex-col gap-5 lg:flex-row">
+          <div className="order-2 min-w-0 flex-1 space-y-5 lg:order-1">
+            {kind === "video" ? (
+              <ContentImport
+                disabled={pending}
+                onImported={applyImportedVideo}
+              />
+            ) : null}
+            <div className="overflow-hidden rounded-lg bg-card shadow-xs ring-1 ring-foreground/10">
+              <Input
+                id="title"
+                name="title"
+                value={title}
+                onChange={(event) => {
+                  const nextTitle = event.target.value
+                  setTitle(nextTitle)
+                  if (!slugManuallyEdited.current) setSlug(toSlug(nextTitle))
+                }}
+                maxLength={1000}
+                placeholder={t("titleOptional")}
+                className="h-auto rounded-none border-0 px-4 py-4 text-xl font-semibold shadow-none focus-visible:ring-0"
+              />
+              <div className="flex items-center gap-2 border-t bg-muted/20 px-4 py-2.5">
+                <Link2 className="size-3.5 shrink-0 text-muted-foreground/60" />
+                <Input
+                  id="slug"
+                  name="slug"
+                  value={slug}
+                  onChange={(event) => {
+                    slugManuallyEdited.current = true
+                    setSlug(toSlug(event.target.value))
+                  }}
+                  maxLength={300}
+                  placeholder={t("slugPlaceholder")}
+                  className="h-6 rounded-none border-0 bg-transparent px-0 text-xs shadow-none focus-visible:ring-0"
+                />
+              </div>
+            </div>
+            <AdminMetabox title={t("description")} contentClassName="p-0">
+              <RichTextEditor
+                id="description"
+                value={descriptionBody}
+                onChange={setDescriptionBody}
+                placeholder={t("postBodyPlaceholder")}
+                disabled={pending}
+                minHeight="14rem"
+                maxLength={20000}
+                labels={{
+                  toolbar: t("editor.toolbar"),
+                  editor: t("editor.editor"),
+                  source: t("editor.source"),
+                }}
+              />
+            </AdminMetabox>
+            {kind !== "post" ? (
+              <>
+                <ContentMediaFields
+                  kind={kind}
+                  value={registeredMetadata}
+                  onChange={setRegisteredMetadata}
+                  pendingMedia={pendingMedia}
+                  onPendingMediaChange={setPendingMedia}
+                  referrerUrl={mediaReferrerUrl}
+                  includeFieldIds={mainMediaFieldIds}
+                  disabled={pending}
+                />
+                <MetadataFields
+                  scope={kind}
+                  value={registeredMetadata}
+                  onChange={setRegisteredMetadata}
+                  relationOptions={content?.relations}
+                  disabled={pending}
+                  variant="metabox"
+                  excludeFieldIds={[
+                    ...contentMediaFieldIds[kind],
+                    "categoryIds",
+                    "tagIds",
+                  ]}
+                />
+                <AdminMetabox
+                  title={t("customMetadata")}
+                  description={t("customMetadataHelp")}
+                  defaultOpen={false}
+                >
+                  <Textarea
+                    aria-label={t("customMetadata")}
+                    value={customMetadata}
+                    onChange={(event) => setCustomMetadata(event.target.value)}
+                    placeholder={'{\n  "customKey": "customValue"\n}'}
+                    rows={10}
+                    className="font-mono text-xs"
+                    spellCheck={false}
+                  />
+                </AdminMetabox>
+                <AdminMetabox title={t("seo")} defaultOpen={false}>
+                  <Field label={t("metaTitle")} htmlFor="metaTitle">
+                    <Input
+                      id="metaTitle"
+                      name="metaTitle"
+                      defaultValue={content?.seo?.metaTitle ?? ""}
+                      maxLength={300}
+                    />
+                  </Field>
+                  <Field label={t("metaDescription")} htmlFor="metaDescription">
+                    <Textarea
+                      id="metaDescription"
+                      name="metaDescription"
+                      defaultValue={content?.seo?.metaDescription ?? ""}
+                      rows={4}
+                      maxLength={160}
+                    />
+                  </Field>
+                  <Field label={t("keywords")} htmlFor="keywords">
+                    <Input
+                      id="keywords"
+                      name="keywords"
+                      defaultValue={content?.seo?.keywords?.join(", ") ?? ""}
+                    />
+                  </Field>
+                </AdminMetabox>
+              </>
+            ) : null}
+          </div>
+          <div
+            className={
+              kind === "post"
+                ? "hidden"
+                : "hidden w-[280px] shrink-0 lg:order-2 lg:block"
+            }
+          >
+            <div className="sticky top-20">
+              {renderPublishingSidebar("desktop")}
+            </div>
+          </div>
         </div>
-      </div>
-    </form>
+      </form>
+      {kind !== "post" ? (
+        <Sheet open={publishingOpen} onOpenChange={setPublishingOpen}>
+          <SheetContent
+            side="right"
+            className="w-[min(92vw,24rem)] overflow-hidden sm:max-w-sm lg:hidden"
+          >
+            <SheetHeader className="border-b">
+              <SheetTitle>{t("publishing")}</SheetTitle>
+              <SheetDescription>{t(`kinds.${kind}`)}</SheetDescription>
+            </SheetHeader>
+            <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain p-4 pt-0">
+              {renderPublishingSidebar("mobile", "content-editor-form")}
+            </div>
+          </SheetContent>
+        </Sheet>
+      ) : null}
+      <Dialog
+        open={Boolean(confirmation)}
+        onOpenChange={(open) => {
+          if (!open && !pending) setConfirmation(null)
+        }}
+      >
+        <DialogContent className="max-h-[calc(100dvh-2rem)] grid-rows-[auto_minmax(0,1fr)_auto] overflow-hidden sm:max-w-lg">
+          <DialogHeader>
+            <DialogTitle>{t("metadataConfirmChannelsTitle")}</DialogTitle>
+            <DialogDescription>
+              {t("metadataConfirmChannelsDescription")}
+            </DialogDescription>
+          </DialogHeader>
+          <div className="min-h-0 space-y-5 overflow-y-auto overscroll-contain pr-1">
+            <ConfirmationGroup
+              label={t("metadataStudio")}
+              items={
+                confirmation?.channels.filter(
+                  (item) => item.kind === "studio"
+                ) ?? []
+              }
+            />
+            <ConfirmationGroup
+              label={t("metadataActor")}
+              items={
+                confirmation?.channels.filter(
+                  (item) => item.kind === "actor"
+                ) ?? []
+              }
+            />
+            <ConfirmationGroup
+              label={t("metadataCategory")}
+              items={
+                confirmation?.terms.filter(
+                  (item) => item.taxonomy === "category"
+                ) ?? []
+              }
+            />
+            <ConfirmationGroup
+              label={t("metadataTag")}
+              items={
+                confirmation?.terms.filter((item) => item.taxonomy === "tag") ??
+                []
+              }
+            />
+          </div>
+          <DialogFooter className="border-t pt-4">
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => setConfirmation(null)}
+              disabled={pending}
+            >
+              {t("cancel")}
+            </Button>
+            <Button
+              type="button"
+              onClick={confirmChannelsAndSave}
+              disabled={pending}
+            >
+              {pending
+                ? t("metadataCheckingChannels")
+                : t("metadataConfirmAndSave")}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+    </>
   )
 }
 
-function FormSection({ title, icon, children }: { title: string; icon?: React.ReactNode; children: React.ReactNode }) { return <section className="rounded-2xl border bg-card p-5 shadow-sm sm:p-6"><h2 className="flex items-center gap-2 text-lg font-semibold">{icon}{title}</h2><div className="mt-5 space-y-5">{children}</div></section> }
-function Field({ label, htmlFor, children }: { label: string; htmlFor: string; children: React.ReactNode }) { return <div className="space-y-2"><Label htmlFor={htmlFor}>{label}</Label>{children}</div> }
-function SelectField({ name, label, defaultValue, children }: { name: string; label: string; defaultValue: string; children: React.ReactNode }) { return <Field label={label} htmlFor={name}><select id={name} name={name} defaultValue={defaultValue} className="h-10 w-full rounded-lg border bg-background px-3 text-sm">{children}</select></Field> }
-function nullableString(value: FormDataEntryValue | null) { const result = typeof value === "string" ? value.trim() : ""; return result || null }
-function isoDate(value: FormDataEntryValue | null) { if (typeof value !== "string" || !value) return null; return new Date(value).toISOString() }
-function localDate(value?: string) { if (!value) return ""; const date = new Date(value); const offset = date.getTimezoneOffset() * 60_000; return new Date(date.getTime() - offset).toISOString().slice(0, 16) }
-function metadataPlaceholder(kind: ContentKind) { const examples = { video: { sourceUrl: "https://...", thumbnailUrl: "https://...", durationSeconds: 0, studioId: null, actorIds: [], termIds: [] }, short: { mediaUrl: "https://...", thumbnailUrl: "https://...", durationSeconds: 0, actorIds: [], termIds: [] }, post: { images: [], actorIds: [], termIds: [], label: "" }, live: { streamUrl: "https://...", posterUrl: "https://...", startsAt: "", studioId: null } }; return JSON.stringify(examples[kind], null, 2) }
+type ContentPayload = {
+  kind: ContentKind
+  title: string | null
+  slug: string | null
+  description: string | null
+  status: string
+  visibility: string
+  moderationStatus: string
+  publishedAt: string | null
+  scheduledAt: string | null
+  metadata: Record<string, unknown>
+  seo: {
+    metaTitle: string | null
+    metaDescription: string | null
+    keywords: string[]
+  }
+}
+
+function ConfirmationGroup({
+  label,
+  items,
+}: {
+  label: string
+  items: Array<{ key: string; name: string }>
+}) {
+  if (!items.length) return null
+  return (
+    <section className="space-y-2">
+      <h3 className="text-sm font-semibold">{label}</h3>
+      <div className="flex flex-wrap gap-2">
+        {items.map((item) => (
+          <span
+            key={item.key}
+            className="max-w-full truncate rounded-full border bg-muted/50 px-3 py-1.5 text-sm"
+          >
+            {item.name}
+          </span>
+        ))}
+      </div>
+    </section>
+  )
+}
+
+function FormSection({
+  title,
+  icon,
+  children,
+  compact = false,
+}: {
+  title: string
+  icon?: React.ReactNode
+  children: React.ReactNode
+  compact?: boolean
+}) {
+  return (
+    <section
+      className={
+        compact
+          ? "rounded-lg bg-card p-4 shadow-xs ring-1 ring-foreground/10"
+          : "rounded-2xl border bg-card p-5 shadow-sm sm:p-6"
+      }
+    >
+      <h2
+        className={
+          compact
+            ? "flex items-center gap-2 text-xs font-semibold tracking-wider text-muted-foreground uppercase"
+            : "flex items-center gap-2 text-lg font-semibold"
+        }
+      >
+        {icon}
+        {title}
+      </h2>
+      <div className={compact ? "mt-4 space-y-4" : "mt-5 space-y-5"}>
+        {children}
+      </div>
+    </section>
+  )
+}
+function Field({
+  label,
+  htmlFor,
+  children,
+}: {
+  label: string
+  htmlFor: string
+  children: React.ReactNode
+}) {
+  return (
+    <div className="space-y-2">
+      <Label htmlFor={htmlFor}>{label}</Label>
+      {children}
+    </div>
+  )
+}
+function SelectField({
+  id,
+  label,
+  value,
+  onChange,
+  children,
+}: {
+  id: string
+  label: string
+  value: string
+  onChange: (value: string) => void
+  children: React.ReactNode
+}) {
+  return (
+    <Field label={label} htmlFor={id}>
+      <select
+        id={id}
+        value={value}
+        onChange={(event) => onChange(event.target.value)}
+        className="h-10 w-full rounded-lg border bg-background px-3 text-sm"
+      >
+        {children}
+      </select>
+    </Field>
+  )
+}
+function SubmitButton({
+  pending,
+  editing,
+  className,
+  form,
+}: {
+  pending: boolean
+  editing: boolean
+  className?: string
+  form?: string
+}) {
+  const t = useTranslations("admin")
+  return (
+    <Button type="submit" form={form} disabled={pending} className={className}>
+      {pending ? (
+        <>
+          <span className="size-4 animate-spin rounded-full border-2 border-current border-t-transparent" />
+          {t("saving")}
+        </>
+      ) : (
+        <>
+          {editing ? <Save className="size-4" /> : <Send className="size-4" />}
+          {t(editing ? "save" : "createAction")}
+        </>
+      )}
+    </Button>
+  )
+}
+function nullableString(value: FormDataEntryValue | null) {
+  const result = typeof value === "string" ? value.trim() : ""
+  return result || null
+}
+function collectPendingMediaTokens(value: unknown) {
+  const tokens = new Set<string>()
+  visit(value)
+  return [...tokens]
+
+  function visit(current: unknown) {
+    if (isPendingMediaToken(current)) {
+      tokens.add(current)
+      return
+    }
+    if (Array.isArray(current)) current.forEach(visit)
+    else if (current && typeof current === "object")
+      Object.values(current as Record<string, unknown>).forEach(visit)
+  }
+}
+function replacePendingMediaToken(
+  value: unknown,
+  token: string,
+  url: string
+): unknown {
+  if (value === token) return url
+  if (Array.isArray(value))
+    return value.map((item) => replacePendingMediaToken(item, token, url))
+  if (value && typeof value === "object")
+    return Object.fromEntries(
+      Object.entries(value as Record<string, unknown>).map(([key, item]) => [
+        key,
+        replacePendingMediaToken(item, token, url),
+      ])
+    )
+  return value
+}
+function releasePendingPreview(selection: PendingMediaSelection) {
+  if (selection.file && selection.previewUrl.startsWith("blob:"))
+    URL.revokeObjectURL(selection.previewUrl)
+}
+function nullableText(value: string) {
+  const result = value.trim()
+  return result || null
+}
+function toSlug(value: string) {
+  return value
+    .normalize("NFKD")
+    .toLowerCase()
+    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/[^\p{L}\p{N}]+/gu, "-")
+    .replace(/^-+|-+$/g, "")
+    .slice(0, 300)
+}
+function cleanImportedUrl(value: string) {
+  const trimmed = value.trim()
+  const markdown = /^\[(https?:\/\/[^\]]+)\]\(https?:\/\/[^)]+\)$/.exec(trimmed)
+  return markdown?.[1] ?? trimmed
+}
+function isFourhoiUrl(value: unknown): value is string {
+  if (typeof value !== "string") return false
+  try {
+    const hostname = new URL(value).hostname.toLowerCase()
+    return hostname === "fourhoi.com" || hostname.endsWith(".fourhoi.com")
+  } catch {
+    return false
+  }
+}
+function isoDate(value: FormDataEntryValue | null) {
+  if (typeof value !== "string" || !value) return null
+  return new Date(value).toISOString()
+}
+function localDate(value?: string) {
+  if (!value) return ""
+  const date = new Date(value)
+  const offset = date.getTimezoneOffset() * 60_000
+  return new Date(date.getTime() - offset).toISOString().slice(0, 16)
+}

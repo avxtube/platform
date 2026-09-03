@@ -54,9 +54,9 @@ export function useShortsNavigation(itemCount: number, onRefresh: () => Promise<
     scrollSettleTimerRef.current = window.setTimeout(() => { targetRef.current = next }, SCROLL_SETTLE_DELAY)
   }, [isDragging, itemCount])
 
-  const handleWheel = React.useCallback((event: React.WheelEvent<HTMLDivElement>) => {
+  const handleWheel = React.useCallback((event: WheelEvent) => {
     if (Math.abs(event.deltaY) < 2) return
-    event.preventDefault()
+    if (event.cancelable) event.preventDefault()
     wheelRef.current += event.deltaY
     if (wheelTimerRef.current) window.clearTimeout(wheelTimerRef.current)
     wheelTimerRef.current = window.setTimeout(() => { wheelRef.current = 0 }, 140)
@@ -152,6 +152,13 @@ export function useShortsNavigation(itemCount: number, onRefresh: () => Promise<
   React.useEffect(() => {
     const element = containerRef.current
     if (!element) return
+    element.addEventListener("wheel", handleWheel, { passive: false })
+    return () => element.removeEventListener("wheel", handleWheel)
+  }, [handleWheel])
+
+  React.useEffect(() => {
+    const element = containerRef.current
+    if (!element) return
     const touchStart = (event: TouchEvent) => { if (event.touches.length === 1) beginTouch(event.touches[0]!.clientY) }
     const touchMove = (event: TouchEvent) => {
       if (!gestureRef.current || event.touches.length !== 1) return
@@ -191,7 +198,6 @@ export function useShortsNavigation(itemCount: number, onRefresh: () => Promise<
     goNext,
     goPrevious,
     handleScroll,
-    handleWheel,
     handleKeyDown,
     isDragging,
     isRefreshing,

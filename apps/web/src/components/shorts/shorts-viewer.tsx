@@ -19,7 +19,7 @@ export function ShortsViewer({ initialPage, initialVideoId, locale }: { initialP
   const t = useTranslations("video")
   const { videos, hasNextPage, isLoading, error, loadNextPage, refreshFeed, retry } = useShortsFeed(initialPage)
   const initialIndex = Math.max(0, initialPage.items.findIndex((item) => item.id === initialVideoId))
-  const { containerRef, currentIndex, goNext, goPrevious, handleScroll, handleWheel, handleKeyDown, isDragging, isRefreshing, pullDistance, pullReady } = useShortsNavigation(videos.length, refreshFeed, initialIndex)
+  const { containerRef, currentIndex, goNext, goPrevious, handleScroll, handleKeyDown, isDragging, isRefreshing, pullDistance, pullReady } = useShortsNavigation(videos.length, refreshFeed, initialIndex)
   const { commentsOpen, shareVideo, remixVideo, closeComments, toggleComments, openShare, closeShare, openRemix, closeRemix } = useShortOverlays()
   const [muted, setMuted] = React.useState(true)
   const current = videos[currentIndex]
@@ -37,7 +37,7 @@ export function ShortsViewer({ initialPage, initialVideoId, locale }: { initialP
     {current ? <ShortMobileControls short={current} /> : null}
     <div className="relative flex min-w-0 flex-1 justify-center">
       <div aria-live="polite" className={`pointer-events-none absolute top-[max(3.5rem,calc(env(safe-area-inset-top)+3rem))] z-50 flex items-center gap-2 rounded-full bg-background/90 px-4 py-2 text-xs font-medium text-foreground shadow transition-opacity ${pullDistance > 4 || isRefreshing ? "opacity-100" : "opacity-0"}`} style={{ transform: `translateY(${Math.min(48, pullDistance / 2)}px)` }}><RefreshCw className={`size-4 ${isRefreshing ? "animate-spin" : ""}`} />{t(isRefreshing ? "shorts.refreshing" : pullReady ? "shorts.releaseRefresh" : "shorts.pullRefresh")}</div>
-      <div ref={containerRef} tabIndex={0} onScroll={handleScroll} onWheel={handleWheel} onKeyDown={handleKeyDown} className={`h-full w-full touch-none snap-y snap-mandatory overflow-y-auto overscroll-contain [scrollbar-width:none] [&::-webkit-scrollbar]:hidden ${isDragging ? "snap-none" : "scroll-smooth"}`}>
+      <div ref={containerRef} tabIndex={0} onScroll={handleScroll} onKeyDown={handleKeyDown} className={`h-full w-full touch-none snap-y snap-mandatory overflow-y-auto overscroll-contain [scrollbar-width:none] [&::-webkit-scrollbar]:hidden ${isDragging ? "snap-none" : "scroll-smooth"}`}>
         {videos.map((short, index) => <article key={short.id} className={`relative flex h-full snap-start snap-always items-center justify-center lg:p-0 ${!isDragging ? "transition-transform duration-200" : ""}`} style={index === 0 && pullDistance > 0 ? { transform: `translate3d(0, ${pullDistance}px, 0)` } : undefined}><div className="relative h-full w-full overflow-hidden bg-black text-white lg:max-w-[470px] lg:rounded-2xl">
           <ShortMediaPlayer short={short} active={index === currentIndex && !commentsOpen} muted={muted} onMutedChange={setMuted} />
           <ShortActions short={short} locale={locale} onComments={toggleComments} onShare={() => openShare(short)} onRemix={() => openRemix(short)} />

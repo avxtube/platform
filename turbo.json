@@ -16,7 +16,9 @@
     "NEXT_PUBLIC_*",
     "ABLY_*",
     "AXIOM_*",
-    "ENCRYPTION_KEY"
+    "ENCRYPTION_KEY",
+    "SCRAPER_API",
+    "VDOHIDE_*"
   ],
   "tasks": {
     "build": {

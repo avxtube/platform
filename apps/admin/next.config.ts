@@ -7,7 +7,10 @@ const nextConfig: NextConfig = {
   transpilePackages: [
     "@workspace/auth",
     "@workspace/core",
+    "@workspace/data-table",
     "@workspace/i18n",
+    "@workspace/metadata",
+    "@workspace/media",
     "@workspace/services",
     "@workspace/ui",
   ],

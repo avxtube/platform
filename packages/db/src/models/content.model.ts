@@ -57,6 +57,7 @@ const contentSchema = new Schema(
             default: "active",
         },
         title: { type: String, trim: true, maxlength: 1_000 },
+        slug: { type: String, trim: true, lowercase: true, maxlength: 300 },
         description: { type: String, maxlength: 20_000 },
         termIds: {
             type: [{ type: String, ref: "Term" }],
@@ -85,6 +86,8 @@ contentSchema.index({ studioId: 1, kind: 1, status: 1, publishedAt: -1 });
 contentSchema.index({ visibility: 1, status: 1, publishedAt: -1 });
 contentSchema.index({ kind: 1, moderationStatus: 1, publishedAt: -1 });
 contentSchema.index({ actorIds: 1, status: 1, publishedAt: -1 });
+contentSchema.index({ "metadata.sourceVideoId": 1, kind: 1 });
+contentSchema.index({ kind: 1, slug: 1 }, { unique: true, partialFilterExpression: { slug: { $type: "string" } } });
 
 export type ContentSchemaType = InferSchemaType<typeof contentSchema>;
 

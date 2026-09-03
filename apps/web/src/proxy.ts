@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server"
 import createMiddleware from "next-intl/middleware"
 
-import { safeRedirectPath } from "@workspace/core/utils"
+import { safeRedirectUrl } from "@workspace/core/utils"
 import {
   defaultLocale,
   isLocale,
@@ -235,10 +235,10 @@ function getRoutingDecision(
 
   // Redirect authenticated users away from Auth Routes (e.g. /login)
   if (session && isAuthRoute && !isOAuthCallback) {
-    // safeRedirectPath: รับเฉพาะ path ภายใน กัน ?callbackUrl=https://evil.com พาออกนอกเว็บ
-    const callbackUrl = safeRedirectPath(
+    const callbackUrl = safeRedirectUrl(
       req.nextUrl.searchParams.get("callbackUrl") ||
-        req.cookies.get("auth_callback_url")?.value
+        req.cookies.get("auth_callback_url")?.value,
+      localeCookieDomain
     )
     const res = NextResponse.redirect(
       new URL(callbackUrl || localizedPath("/", locale), currentUrl)

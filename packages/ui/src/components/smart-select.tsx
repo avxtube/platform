@@ -131,6 +131,47 @@ export function SmartSelect({
     return option ? [option] : []
   })
 
+  React.useEffect(() => {
+    const values = new Set(
+      multiple
+        ? Array.isArray(actualValue)
+          ? actualValue
+          : []
+        : typeof actualValue === "string" && actualValue
+          ? [actualValue]
+          : []
+    )
+    const selected = options.filter((option) => values.has(option.value))
+    if (selected.length === 0) return
+
+    setSelectedCache((current) => {
+      const changed = selected.some(
+        (option) =>
+          current[option.value]?.label !== option.label ||
+          current[option.value]?.description !== option.description
+      )
+      if (!changed) return current
+
+      return selected.reduce<Record<string, SmartSelectOption>>(
+        (next, option) => {
+          next[option.value] = option
+          return next
+        },
+        { ...current }
+      )
+    })
+  }, [actualValue, multiple, options])
+
+  const normalizedSearch = search.trim()
+  const hasEnoughSearchCharacters =
+    !asyncMode || normalizedSearch.length >= searchMinChars
+  const isWaitingForSearch =
+    asyncMode &&
+    hasEnoughSearchCharacters &&
+    (searching || normalizedSearch !== lastSearchRef.current)
+  const showOptions =
+    !asyncMode || (hasEnoughSearchCharacters && !isWaitingForSearch)
+
   function updateValue(nextValue: string | string[]) {
     setInternalValue(nextValue)
     onValueChange?.(nextValue)
@@ -307,7 +348,7 @@ export function SmartSelect({
             {...(asyncMode ? { value: search, onValueChange: setSearch } : {})}
           />
           <CommandList>
-            {asyncMode && searching ? (
+            {isWaitingForSearch ? (
               <div className="flex items-center justify-center gap-2 py-5 text-sm text-muted-foreground">
                 <Loader2Icon
                   className="size-4 animate-spin"
@@ -317,13 +358,13 @@ export function SmartSelect({
               </div>
             ) : (
               <CommandEmpty>
-                {asyncMode && search.trim().length < searchMinChars
+                {asyncMode && !hasEnoughSearchCharacters
                   ? searchHintText.replace("{{count}}", String(searchMinChars))
                   : emptyText}
               </CommandEmpty>
             )}
 
-            <CommandGroup className={cn(asyncMode && searching && "hidden")}>
+            <CommandGroup className={cn(!showOptions && "hidden")}>
               {options.map((option) => {
                 const isSelected = selectedValues.includes(option.value)
                 const searchValue = [

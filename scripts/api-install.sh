@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 
-# VdoHide API installer for the private vdohide/platform repository.
-# See api-install.txt for the authenticated command used to download this script.
+# AVXTUBE API installer for the private avxtube/platform repository.
+# See scripts/README.md for the authenticated command used to download this script.
 
 set -Eeuo pipefail
 
@@ -18,6 +18,8 @@ PORT="4000"
 APP_NAME="avxtube-service"
 APP_DIR="/opt/$APP_NAME"
 SERVICE_NAME="avxtube-service"
+LEGACY_APP_DIR="/opt/vdohide-service"
+LEGACY_SERVICE_NAME="vdohide-service"
 GITHUB_REPO="avxtube/platform"
 GITHUB_API_URL="https://api.github.com/repos/$GITHUB_REPO"
 GITHUB_API_VERSION="2022-11-28"
@@ -36,10 +38,10 @@ require_option_value() {
 }
 
 show_help() {
-    echo "VdoHide API Installer (Node.js, no nginx)"
+    echo "AVXTUBE API Installer (Node.js, no nginx)"
     echo
     echo "The private repository requires GITHUB_TOKEN or GH_TOKEN."
-    echo "See scripts/api-install.txt for the authenticated download command."
+    echo "See scripts/README.md for the authenticated download command."
     echo
     echo "Options:"
     echo "  --uninstall          Uninstall completely"
@@ -241,6 +243,10 @@ fi
 print_status "Release checksum verified"
 
 systemctl stop "$SERVICE_NAME" 2>/dev/null || true
+if [ "$LEGACY_SERVICE_NAME" != "$SERVICE_NAME" ] && systemctl list-unit-files "${LEGACY_SERVICE_NAME}.service" --no-legend 2>/dev/null | grep -q "${LEGACY_SERVICE_NAME}.service"; then
+    print_warning "Stopping legacy service $LEGACY_SERVICE_NAME to free port $PORT..."
+    systemctl stop "$LEGACY_SERVICE_NAME"
+fi
 mkdir -p "$APP_DIR"
 if [[ "$APP_DIR" == /opt/* ]]; then
     rm -rf -- "$APP_DIR/dist" "$APP_DIR/node_modules"
@@ -260,6 +266,9 @@ elif [ -n "$DATABASE_URL" ]; then
     } > "$APP_DIR/.env"
 elif [ -f "$APP_DIR/.env" ]; then
     print_status "Keeping the existing environment file"
+elif [ -f "$LEGACY_APP_DIR/.env" ]; then
+    print_status "Migrating the environment file from $LEGACY_APP_DIR..."
+    install -m 600 "$LEGACY_APP_DIR/.env" "$APP_DIR/.env"
 else
     print_error "No environment configuration was provided"
     print_error "Use --env-file FILE or --database-url URI"
@@ -269,7 +278,7 @@ fi
 NODE_BIN=$(command -v node)
 cat > "/etc/systemd/system/${SERVICE_NAME}.service" <<EOF
 [Unit]
-Description=VdoHide API
+Description=AVXTUBE API
 After=network-online.target
 Wants=network-online.target
 
@@ -290,14 +299,27 @@ systemctl daemon-reload
 systemctl enable "$SERVICE_NAME"
 systemctl start "$SERVICE_NAME"
 
-sleep 2
+HEALTH_URL="http://127.0.0.1:$PORT/v1/health"
+HEALTHY=false
+for _ in {1..15}; do
+    if curl -fsS --max-time 3 "$HEALTH_URL" >/dev/null 2>&1; then
+        HEALTHY=true
+        break
+    fi
+    sleep 1
+done
+
 echo
 echo "============================================"
-if systemctl is-active --quiet "$SERVICE_NAME"; then
+if [ "$HEALTHY" = true ] && systemctl is-active --quiet "$SERVICE_NAME"; then
     print_status "Installation completed successfully"
+    if [ "$LEGACY_SERVICE_NAME" != "$SERVICE_NAME" ]; then
+        systemctl disable "$LEGACY_SERVICE_NAME" 2>/dev/null || true
+    fi
 else
-    print_warning "Service is not running; recent logs follow"
-    journalctl -u "$SERVICE_NAME" -n 15 --no-pager
+    print_error "Service failed its health check: $HEALTH_URL"
+    journalctl -u "$SERVICE_NAME" -n 30 --no-pager
+    exit 1
 fi
 echo "============================================"
 echo "  Release:    $RELEASE_TAG"
@@ -305,5 +327,5 @@ echo "  Port:       $PORT"
 echo
 echo "  View logs:  journalctl -u $SERVICE_NAME -f"
 echo "  Restart:    systemctl restart $SERVICE_NAME"
-echo "  Health:     curl http://localhost:$PORT/health"
+echo "  Health:     curl $HEALTH_URL"
 echo "============================================"

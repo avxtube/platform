@@ -11,6 +11,33 @@ export function safeRedirectPath(url: string | null | undefined): string | null 
     return url;
 }
 
+/**
+ * Accept an internal path or an absolute HTTP(S) URL owned by the configured
+ * cookie domain. This supports SSO redirects between trusted subdomains while
+ * continuing to reject arbitrary external URLs.
+ */
+export function safeRedirectUrl(
+    url: string | null | undefined,
+    allowedDomain: string | null | undefined,
+): string | null {
+    const internalPath = safeRedirectPath(url);
+    if (internalPath) return internalPath;
+    if (!url || !allowedDomain) return null;
+
+    const domain = allowedDomain.trim().replace(/^\./, "").toLowerCase();
+    if (!domain) return null;
+
+    try {
+        const target = new URL(url);
+        const isHttp = target.protocol === "http:" || target.protocol === "https:";
+        const isOwnedHost = target.hostname === domain || target.hostname.endsWith(`.${domain}`);
+        if (!isHttp || !isOwnedHost || target.username || target.password) return null;
+        return target.toString();
+    } catch {
+        return null;
+    }
+}
+
 export const USERNAME_MIN_LENGTH = 3;
 export const USERNAME_MAX_LENGTH = 30;
 

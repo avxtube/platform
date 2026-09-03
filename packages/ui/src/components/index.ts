@@ -43,6 +43,7 @@ export * from "./popover";
 export * from "./progress";
 export * from "./questionnaire";
 export * from "./radio-group";
+export * from "./rich-text-editor";
 export * from "./resizable";
 export * from "./scroll-area";
 export * from "./native-select";

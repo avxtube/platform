@@ -9,19 +9,24 @@
         "typecheck": "tsc --noEmit"
     },
     "dependencies": {
+        "@aws-sdk/client-s3": "^3.1123.0",
         "@workspace/auth": "workspace:*",
         "@workspace/core": "workspace:*",
         "@workspace/db": "workspace:*",
+        "@workspace/media": "workspace:*",
         "better-auth": "^1.6.29",
         "cors": "^2.8.5",
         "dotenv": "^17.4.2",
         "express": "5.2.1",
+        "file-type": "^20.5.0",
         "mongodb": "7.5.0",
-        "mongoose": "9.7.4"
+        "mongoose": "9.7.4",
+        "multer": "^2.3.0"
     },
     "devDependencies": {
         "@types/cors": "^2.8.19",
         "@types/express": "^5.0.6",
+        "@types/multer": "^2.2.0",
         "@types/node": "^20",
         "tsup": "^8.5.1",
         "tsx": "^4",

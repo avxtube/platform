@@ -3,7 +3,7 @@ import { buttonVariants, Card, CardContent, CardDescription, CardHeader, CardTit
 import { AlertTriangle, ShieldX, UserX, Ban } from "lucide-react";
 import { Link } from "@/i18n/navigation";
 import { cn } from "@workspace/ui/lib/utils";
-import { safeRedirectPath } from "@workspace/core/utils";
+import { safeRedirectUrl } from "@workspace/core/utils";
 import { getTranslations } from "next-intl/server";
 
 export const dynamic = 'force-dynamic';
@@ -50,7 +50,7 @@ export default async function ErrorPage({ searchParams }: { searchParams: Promis
     const t = await getTranslations("auth");
     const params = await searchParams;
     const errorCode = params.error || "";
-    const callbackUrl = safeRedirectPath(params.callbackUrl) || "/login";
+    const callbackUrl = safeRedirectUrl(params.callbackUrl, process.env.NEXT_PUBLIC_COOKIE_DOMAIN) || "/login";
     const config = errorConfig[errorCode] || defaultError;
     const Icon = config.icon;
 

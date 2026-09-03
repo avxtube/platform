@@ -1,154 +1,251 @@
-import type { Video } from "@workspace/core/types";
+import type { Video, VideoChannel } from "@workspace/core/types"
 
-const featuredVideos: Video[] = [
+type MockVideo = Video & { channel: VideoChannel }
+
+const featuredVideos: MockVideo[] = [
   {
     id: "city-lights-bangkok",
     title: "Bangkok After Dark: A Cinematic City Walk",
-    description: "Explore Bangkok's glowing streets, night markets, and skyline in 4K.",
-    thumbnailUrl: "https://images.unsplash.com/photo-1508009603885-50cf7c579365?auto=format&fit=crop&w=960&q=80",
+    description:
+      "Explore Bangkok's glowing streets, night markets, and skyline in 4K.",
+    thumbnailUrl:
+      "https://images.unsplash.com/photo-1508009603885-50cf7c579365?auto=format&fit=crop&w=960&q=80",
     durationSeconds: 754,
     viewCount: 184200,
     publishedAt: "2026-08-29T10:00:00.000Z",
     category: "Travel",
-    channel: { id: "urban-lens", name: "Urban Lens", handle: "@urbanlens", avatarUrl: null, verified: true },
+    channel: {
+      id: "urban-lens",
+      name: "Urban Lens",
+      handle: "@urbanlens",
+      avatarUrl: null,
+      verified: true,
+    },
   },
   {
     id: "street-food-guide",
     title: "The Ultimate Thai Street Food Guide",
     description: "Ten dishes you should try on your next trip to Thailand.",
-    thumbnailUrl: "https://images.unsplash.com/photo-1559314809-0d155014e29e?auto=format&fit=crop&w=960&q=80",
+    thumbnailUrl:
+      "https://images.unsplash.com/photo-1559314809-0d155014e29e?auto=format&fit=crop&w=960&q=80",
     durationSeconds: 1092,
     viewCount: 986000,
     publishedAt: "2026-08-27T13:30:00.000Z",
     category: "Food",
-    channel: { id: "taste-trails", name: "Taste Trails", handle: "@tastetrails", avatarUrl: null, verified: true },
+    channel: {
+      id: "taste-trails",
+      name: "Taste Trails",
+      handle: "@tastetrails",
+      avatarUrl: null,
+      verified: true,
+    },
   },
   {
     id: "build-video-platform",
     title: "Building a Modern Video Platform with Next.js",
-    description: "A practical walkthrough of the architecture behind a scalable video app.",
-    thumbnailUrl: "https://images.unsplash.com/photo-1516321318423-f06f85e504b3?auto=format&fit=crop&w=960&q=80",
+    description:
+      "A practical walkthrough of the architecture behind a scalable video app.",
+    thumbnailUrl:
+      "https://images.unsplash.com/photo-1516321318423-f06f85e504b3?auto=format&fit=crop&w=960&q=80",
     durationSeconds: 1528,
     viewCount: 47200,
     publishedAt: "2026-08-24T08:15:00.000Z",
     category: "Technology",
-    channel: { id: "dev-studio", name: "Dev Studio", handle: "@devstudio", avatarUrl: null, verified: false },
+    channel: {
+      id: "dev-studio",
+      name: "Dev Studio",
+      handle: "@devstudio",
+      avatarUrl: null,
+      verified: false,
+    },
   },
   {
     id: "island-drone",
     title: "Thailand's Hidden Islands from Above",
-    description: "A relaxing aerial journey across clear water and untouched beaches.",
-    thumbnailUrl: "https://images.unsplash.com/photo-1507525428034-b723cf961d3e?auto=format&fit=crop&w=960&q=80",
+    description:
+      "A relaxing aerial journey across clear water and untouched beaches.",
+    thumbnailUrl:
+      "https://images.unsplash.com/photo-1507525428034-b723cf961d3e?auto=format&fit=crop&w=960&q=80",
     durationSeconds: 488,
     viewCount: 1200000,
     publishedAt: "2026-08-20T04:45:00.000Z",
     category: "Travel",
-    channel: { id: "above-earth", name: "Above Earth", handle: "@aboveearth", avatarUrl: null, verified: true },
+    channel: {
+      id: "above-earth",
+      name: "Above Earth",
+      handle: "@aboveearth",
+      avatarUrl: null,
+      verified: true,
+    },
   },
   {
     id: "home-studio-lighting",
     title: "Simple Lighting Setup for a Home Studio",
-    description: "Make professional-looking videos with a compact three-light setup.",
-    thumbnailUrl: "https://images.unsplash.com/photo-1598488035139-bdbb2231ce04?auto=format&fit=crop&w=960&q=80",
+    description:
+      "Make professional-looking videos with a compact three-light setup.",
+    thumbnailUrl:
+      "https://images.unsplash.com/photo-1598488035139-bdbb2231ce04?auto=format&fit=crop&w=960&q=80",
     durationSeconds: 643,
     viewCount: 73800,
     publishedAt: "2026-08-18T16:20:00.000Z",
     category: "Creators",
-    channel: { id: "creator-lab", name: "Creator Lab", handle: "@creatorlab", avatarUrl: null, verified: false },
+    channel: {
+      id: "creator-lab",
+      name: "Creator Lab",
+      handle: "@creatorlab",
+      avatarUrl: null,
+      verified: false,
+    },
   },
   {
     id: "lofi-focus-session",
     title: "Deep Focus — 60 Minute Lo-fi Session",
-    description: "Calm instrumental beats for studying, coding, and focused work.",
-    thumbnailUrl: "https://images.unsplash.com/photo-1511379938547-c1f69419868d?auto=format&fit=crop&w=960&q=80",
+    description:
+      "Calm instrumental beats for studying, coding, and focused work.",
+    thumbnailUrl:
+      "https://images.unsplash.com/photo-1511379938547-c1f69419868d?auto=format&fit=crop&w=960&q=80",
     durationSeconds: 3600,
     viewCount: 2400000,
     publishedAt: "2026-08-15T12:00:00.000Z",
     category: "Music",
-    channel: { id: "quiet-room", name: "Quiet Room", handle: "@quietroom", avatarUrl: null, verified: true },
+    channel: {
+      id: "quiet-room",
+      name: "Quiet Room",
+      handle: "@quietroom",
+      avatarUrl: null,
+      verified: true,
+    },
   },
   {
     id: "camera-basics",
     title: "Camera Basics in 12 Minutes",
-    description: "Understand aperture, shutter speed, and ISO without the jargon.",
-    thumbnailUrl: "https://images.unsplash.com/photo-1516035069371-29a1b244cc32?auto=format&fit=crop&w=960&q=80",
+    description:
+      "Understand aperture, shutter speed, and ISO without the jargon.",
+    thumbnailUrl:
+      "https://images.unsplash.com/photo-1516035069371-29a1b244cc32?auto=format&fit=crop&w=960&q=80",
     durationSeconds: 721,
     viewCount: 319000,
     publishedAt: "2026-08-12T09:10:00.000Z",
     category: "Education",
-    channel: { id: "frame-school", name: "Frame School", handle: "@frameschool", avatarUrl: null, verified: true },
+    channel: {
+      id: "frame-school",
+      name: "Frame School",
+      handle: "@frameschool",
+      avatarUrl: null,
+      verified: true,
+    },
   },
   {
     id: "morning-workout",
     title: "20-Minute Full Body Morning Workout",
     description: "An equipment-free routine to start the day with more energy.",
-    thumbnailUrl: "https://images.unsplash.com/photo-1517836357463-d25dfeac3438?auto=format&fit=crop&w=960&q=80",
+    thumbnailUrl:
+      "https://images.unsplash.com/photo-1517836357463-d25dfeac3438?auto=format&fit=crop&w=960&q=80",
     durationSeconds: 1235,
     viewCount: 562000,
     publishedAt: "2026-08-08T01:30:00.000Z",
     category: "Fitness",
-    channel: { id: "move-daily", name: "Move Daily", handle: "@movedaily", avatarUrl: null, verified: false },
+    channel: {
+      id: "move-daily",
+      name: "Move Daily",
+      handle: "@movedaily",
+      avatarUrl: null,
+      verified: false,
+    },
   },
   {
     id: "coffee-at-home",
     title: "Make Café-Quality Coffee at Home",
-    description: "Dial in your beans and brew a balanced cup with simple tools.",
-    thumbnailUrl: "https://images.unsplash.com/photo-1495474472287-4d71bcdd2085?auto=format&fit=crop&w=960&q=80",
+    description:
+      "Dial in your beans and brew a balanced cup with simple tools.",
+    thumbnailUrl:
+      "https://images.unsplash.com/photo-1495474472287-4d71bcdd2085?auto=format&fit=crop&w=960&q=80",
     durationSeconds: 534,
     viewCount: 128000,
     publishedAt: "2026-08-04T06:00:00.000Z",
     category: "Lifestyle",
-    channel: { id: "daily-craft", name: "Daily Craft", handle: "@dailycraft", avatarUrl: null, verified: false },
+    channel: {
+      id: "daily-craft",
+      name: "Daily Craft",
+      handle: "@dailycraft",
+      avatarUrl: null,
+      verified: false,
+    },
   },
   {
     id: "night-sky-timelapse",
     title: "Milky Way Timelapse Under a Clear Sky",
     description: "A quiet night beneath the stars captured frame by frame.",
-    thumbnailUrl: "https://images.unsplash.com/photo-1462331940025-496dfbfc7564?auto=format&fit=crop&w=960&q=80",
+    thumbnailUrl:
+      "https://images.unsplash.com/photo-1462331940025-496dfbfc7564?auto=format&fit=crop&w=960&q=80",
     durationSeconds: 392,
     viewCount: 877000,
     publishedAt: "2026-07-30T18:40:00.000Z",
     category: "Science",
-    channel: { id: "open-sky", name: "Open Sky", handle: "@opensky", avatarUrl: null, verified: true },
+    channel: {
+      id: "open-sky",
+      name: "Open Sky",
+      handle: "@opensky",
+      avatarUrl: null,
+      verified: true,
+    },
   },
   {
     id: "desk-setup",
     title: "Minimal Desk Setup for Better Focus",
-    description: "A clean workspace designed around comfort and fewer distractions.",
-    thumbnailUrl: "https://images.unsplash.com/photo-1497366811353-6870744d04b2?auto=format&fit=crop&w=960&q=80",
+    description:
+      "A clean workspace designed around comfort and fewer distractions.",
+    thumbnailUrl:
+      "https://images.unsplash.com/photo-1497366811353-6870744d04b2?auto=format&fit=crop&w=960&q=80",
     durationSeconds: 806,
     viewCount: 205000,
     publishedAt: "2026-07-26T11:25:00.000Z",
     category: "Lifestyle",
-    channel: { id: "intentional-space", name: "Intentional Space", handle: "@intentionalspace", avatarUrl: null, verified: false },
+    channel: {
+      id: "intentional-space",
+      name: "Intentional Space",
+      handle: "@intentionalspace",
+      avatarUrl: null,
+      verified: false,
+    },
   },
   {
     id: "mountain-trail",
     title: "A Weekend Hiking Thailand's Northern Trails",
-    description: "Mist-covered mountains, forest trails, and a sunrise worth the climb.",
-    thumbnailUrl: "https://images.unsplash.com/photo-1464822759023-fed622ff2c3b?auto=format&fit=crop&w=960&q=80",
+    description:
+      "Mist-covered mountains, forest trails, and a sunrise worth the climb.",
+    thumbnailUrl:
+      "https://images.unsplash.com/photo-1464822759023-fed622ff2c3b?auto=format&fit=crop&w=960&q=80",
     durationSeconds: 1184,
     viewCount: 94100,
     publishedAt: "2026-07-21T03:15:00.000Z",
     category: "Adventure",
-    channel: { id: "trail-notes", name: "Trail Notes", handle: "@trailnotes", avatarUrl: null, verified: false },
+    channel: {
+      id: "trail-notes",
+      name: "Trail Notes",
+      handle: "@trailnotes",
+      avatarUrl: null,
+      verified: false,
+    },
   },
-];
+]
 
 const latestPrefixes = [
   "Behind the Scenes",
   "Creator's Cut",
   "Everything You Missed",
   "A Different Perspective",
-];
+]
 
-export const mockVideos: Video[] = [
+export const mockVideos: MockVideo[] = [
   ...featuredVideos,
   ...featuredVideos.map((video, index) => ({
     ...video,
     id: `${video.id}-latest`,
     title: `${latestPrefixes[index % latestPrefixes.length]}: ${video.title}`,
     viewCount: Math.max(1_000, Math.round(video.viewCount * 0.42)),
-    publishedAt: new Date(Date.parse(video.publishedAt) - 30 * 86_400_000).toISOString(),
+    publishedAt: new Date(
+      Date.parse(video.publishedAt) - 30 * 86_400_000
+    ).toISOString(),
   })),
-];
+]

@@ -2,7 +2,8 @@ import "server-only"
 
 import { headers } from "next/headers"
 
-import type { AdminContent, ContentKind, ContentListResponse } from "./content"
+import type { AdminContent, ContentKind, ContentListResponse, ContentRelations } from "./content"
+import type { AdminStorage } from "./storage"
 
 const apiUrl = process.env.API_INTERNAL_URL ?? "http://localhost:4000"
 
@@ -23,11 +24,18 @@ export async function getContents(input: {
 }
 
 export async function getContent(id: string): Promise<AdminContent | null> {
-  const response = await fetchAdmin<{ content: AdminContent } | null>(
+  const response = await fetchAdmin<{ content: AdminContent; relations: ContentRelations } | null>(
     new URL(`/v1/admin/contents/${encodeURIComponent(id)}`, apiUrl),
     true,
   )
-  return response?.content ?? null
+  return response ? { ...response.content, relations: response.relations } : null
+}
+
+export async function getStorages(): Promise<AdminStorage[]> {
+  const response = await fetchAdmin<{ storages: AdminStorage[] }>(
+    new URL("/v1/admin/storages", apiUrl),
+  )
+  return response.storages
 }
 
 async function fetchAdmin<T>(url: URL, allowNotFound = false): Promise<T> {
