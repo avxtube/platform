@@ -9,6 +9,6 @@ export default defineConfig({
     splitting: false,
     sourcemap: true,
     clean: true,
-    noExternal: ["@workspace/auth", "@workspace/core", "@workspace/db"],
-    external: ["mongodb", "mongoose"],
+    noExternal: ["@workspace/auth", "@workspace/core", "@workspace/db", "@workspace/media"],
+    external: ["mongodb", "mongoose", "sharp"],
 });

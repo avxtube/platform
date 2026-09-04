@@ -38,8 +38,30 @@ jobs:
       - name: Build API
         run: pnpm --filter api build
 
+      - name: Verify API bundle has no workspace runtime imports
+        run: |
+          node <<'NODE'
+          const fs = require("node:fs")
+          const source = fs.readFileSync("apps/api/dist/server.js", "utf8")
+          const runtimeWorkspaceImport = [
+            /from\s+["']@workspace\//,
+            /import\s*\(\s*["']@workspace\//,
+            /require\s*\(\s*["']@workspace\//,
+          ].some((pattern) => pattern.test(source))
+          if (runtimeWorkspaceImport) {
+            console.error("API bundle still imports TypeScript workspace packages")
+            process.exit(1)
+          }
+          NODE
+
       - name: Create standalone API package
         run: pnpm --filter api deploy --prod out/api
+
+      - name: Verify standalone API runtime dependencies
+        working-directory: out/api
+        run: |
+          node --check dist/server.js
+          node --input-type=module -e "await import('sharp')"
 
       - name: Package release tarball
         run: |
