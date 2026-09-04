@@ -2,14 +2,13 @@
 "use client"
 
 import type { Playlist, Video, WatchData } from "@workspace/core/types"
-import { BadgeCheck, LoaderCircle, MessageCircle, X } from "lucide-react"
+import { authClient } from "@workspace/auth/client"
+import { BadgeCheck, MessageCircle, X } from "lucide-react"
 import { useTranslations } from "next-intl"
 import * as React from "react"
 
 import { FollowActorButton } from "@/components/actor/follow-actor-button"
 import { Link } from "@/i18n/navigation"
-import { useInfiniteLoad } from "@/hooks/use-infinite-load"
-import { useRelatedVideos } from "@/hooks/use-related-videos"
 
 import { VideoActions } from "./video-actions"
 import { WatchComments } from "./watch-comments"
@@ -26,35 +25,42 @@ export function WatchExperience({
   playlist?: Playlist | null
 }) {
   const t = useTranslations("video")
+  const { data: session } = authClient.useSession()
+  const userId = session?.user?.id
   const [theater, setTheater] = React.useState(false)
   const [autoplay, setAutoplay] = React.useState(true)
   const [mobileCommentsOpen, setMobileCommentsOpen] = React.useState(false)
+  const [detailsExpanded, setDetailsExpanded] = React.useState(false)
   const toggleTheater = React.useCallback(
     () => setTheater((value) => !value),
     []
   )
   const { video } = data
-  const related = useRelatedVideos(
-    video.id,
-    data.relatedVideos,
-    data.relatedNextCursor
-  )
-  const relatedLoadMoreRef = useInfiniteLoad({
-    hasMore: related.hasMore,
-    loading: related.loading,
-    error: related.error,
-    loadMore: related.loadMore,
-  })
+  React.useEffect(() => {
+    if (!userId) return
+    const controller = new AbortController()
+    fetch(`/api/v1/videos/${encodeURIComponent(video.id)}/history`, {
+      method: "POST",
+      signal: controller.signal,
+    }).catch((error) => {
+      if (!(error instanceof DOMException && error.name === "AbortError"))
+        console.error("[watch-history]", error)
+    })
+    return () => controller.abort()
+  }, [userId, video.id])
+  const related = data.relatedVideos.slice(0, 20)
   const views = Intl.NumberFormat(locale, {
     notation: "compact",
     maximumFractionDigits: 1,
   }).format(video.viewCount)
-  const published = new Intl.DateTimeFormat(locale, {
+  const releaseDate = video.releaseDate
+    ? new Intl.DateTimeFormat(locale, {
     day: "numeric",
     month: "long",
     year: "numeric",
     timeZone: "Asia/Bangkok",
-  }).format(new Date(video.publishedAt))
+      }).format(new Date(video.releaseDate))
+    : null
   const channelHref = video.channel
     ? `/channel/${video.channel.handle.replace(/^@/, "")}`
     : null
@@ -107,20 +113,29 @@ export function WatchExperience({
                 {video.channel.handle}
               </p>
             </div>
-            <FollowActorButton />
+            <FollowActorButton channelId={video.channel.id} />
           </div>
         ) : null}
         <VideoActions video={video} locale={locale} />
       </div>
       <div className="mt-5 rounded-xl bg-muted/60 p-4">
         <p className="font-semibold">
-          {t("views", { count: views })} • {published}
+          {t("views", { count: views })}
+          {releaseDate ? ` • ${releaseDate}` : ""}
         </p>
-        <p className="mt-3 line-clamp-3 text-sm leading-6 whitespace-pre-line">
+        <p
+          className={`mt-3 text-sm leading-6 whitespace-pre-line ${detailsExpanded ? "" : "line-clamp-3"}`}
+        >
           {video.description}
         </p>
-        <button type="button" className="mt-2 text-sm font-semibold">
-          {t("showMore")}
+        {detailsExpanded ? <VideoDetails video={video} /> : null}
+        <button
+          type="button"
+          aria-expanded={detailsExpanded}
+          onClick={() => setDetailsExpanded((value) => !value)}
+          className="mt-2 text-sm font-semibold"
+        >
+          {t(detailsExpanded ? "showLess" : "showMore")}
         </button>
       </div>
       <button
@@ -129,7 +144,7 @@ export function WatchExperience({
         className="mt-4 flex w-full items-center justify-between rounded-xl bg-muted/60 p-4 text-left sm:hidden"
       >
         <span>
-          <strong>{t("comments", { count: data.comments.length })}</strong>
+          <strong>{t("comments", { count: data.commentsTotal })}</strong>
           <span className="mt-1 block text-xs text-muted-foreground">
             {data.comments[0]?.message}
           </span>
@@ -141,6 +156,7 @@ export function WatchExperience({
           videoId={video.id}
           initialComments={data.comments}
           initialNextCursor={data.commentsNextCursor}
+          initialTotal={data.commentsTotal}
           locale={locale}
         />
       </div>
@@ -152,7 +168,7 @@ export function WatchExperience({
           <section
             role="dialog"
             aria-modal="true"
-            aria-label={t("comments", { count: data.comments.length })}
+            aria-label={t("comments", { count: data.commentsTotal })}
             onClick={(event) => event.stopPropagation()}
             className="absolute inset-x-0 bottom-0 max-h-[80svh] overflow-y-auto rounded-t-2xl bg-background p-4 text-foreground"
           >
@@ -169,6 +185,7 @@ export function WatchExperience({
               videoId={video.id}
               initialComments={data.comments}
               initialNextCursor={data.commentsNextCursor}
+              initialTotal={data.commentsTotal}
               locale={locale}
             />
           </section>
@@ -204,7 +221,7 @@ export function WatchExperience({
         </label>
       </div>
       <div className="divide-y sm:space-y-4 sm:divide-y-0">
-        {related.items.map((item) => (
+        {related.map((item) => (
           <RelatedVideoCard
             key={item.id}
             video={item}
@@ -216,30 +233,6 @@ export function WatchExperience({
           />
         ))}
       </div>
-      <div ref={relatedLoadMoreRef} aria-hidden="true" className="h-px" />
-      {related.loading ? (
-        <div
-          role="status"
-          className="mt-5 flex items-center justify-center gap-2 text-xs text-muted-foreground"
-        >
-          <LoaderCircle className="size-4 animate-spin" />
-          {t("loadingMore")}
-        </div>
-      ) : null}
-      {related.error ? (
-        <button
-          type="button"
-          onClick={() => void related.loadMore()}
-          className="mx-3 mt-5 w-[calc(100%-1.5rem)] rounded-full bg-muted px-4 py-2.5 text-sm font-semibold hover:bg-accent disabled:opacity-60 sm:mx-0 sm:w-full"
-        >
-          {t("retry")}
-        </button>
-      ) : null}
-      {!related.hasMore ? (
-        <p className="mt-5 text-center text-xs text-muted-foreground">
-          {t("allLoaded")}
-        </p>
-      ) : null}
     </aside>
   )
 
@@ -261,6 +254,70 @@ export function WatchExperience({
       </div>
       {next}
     </div>
+  )
+}
+
+function VideoDetails({ video }: { video: Video }) {
+  const t = useTranslations("video")
+  const groups = [
+    {
+      key: "actors",
+      label: t("detailsActors"),
+      items: (video.actors ?? []).map((item) => ({
+        id: item.id,
+        label: item.name,
+        href: `/channel/${item.handle.replace(/^@/, "")}`,
+      })),
+    },
+    {
+      key: "studios",
+      label: t("detailsStudios"),
+      items: (video.studios ?? []).map((item) => ({
+        id: item.id,
+        label: item.name,
+        href: `/channel/${item.handle.replace(/^@/, "")}`,
+      })),
+    },
+    {
+      key: "categories",
+      label: t("detailsCategories"),
+      items: (video.categories ?? []).map((item) => ({
+        id: item.id,
+        label: item.name,
+        href: `/?category=${encodeURIComponent(item.slug)}`,
+      })),
+    },
+    {
+      key: "tags",
+      label: t("detailsTags"),
+      items: (video.tags ?? []).map((item) => ({
+        id: item.id,
+        label: item.name,
+        href: `/search?q=${encodeURIComponent(item.name)}`,
+      })),
+    },
+  ].filter((group) => group.items.length)
+
+  if (!groups.length) return null
+  return (
+    <dl className="mt-5 space-y-4 border-t border-border/70 pt-4 text-sm">
+      {groups.map((group) => (
+        <div key={group.key} className="grid gap-2 sm:grid-cols-[120px_1fr]">
+          <dt className="font-semibold">{group.label}</dt>
+          <dd className="flex flex-wrap gap-x-3 gap-y-1">
+            {group.items.map((item) => (
+              <Link
+                key={item.id}
+                href={item.href}
+                className="text-muted-foreground hover:text-foreground hover:underline"
+              >
+                {item.label}
+              </Link>
+            ))}
+          </dd>
+        </div>
+      ))}
+    </dl>
   )
 }
 

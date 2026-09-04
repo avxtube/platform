@@ -48,8 +48,16 @@ export function HistoryPage({
   )
   const shorts = visible.filter((entry) => entry.type === "short")
   const videos = visible.filter((entry) => entry.type !== "short")
-  const remove = (id: string) =>
+  const remove = (id: string) => {
     setEntries((current) => current.filter((entry) => entry.id !== id))
+    void fetch(`/api/v1/collections/history/${encodeURIComponent(id)}`, {
+      method: "DELETE",
+    })
+  }
+  const clear = () => {
+    setEntries([])
+    void fetch("/api/v1/collections/history", { method: "DELETE" })
+  }
 
   return (
     <div className="grid gap-12 pb-10 lg:grid-cols-[minmax(0,1fr)_280px] xl:gap-20">
@@ -101,7 +109,7 @@ export function HistoryPage({
         <div className="space-y-2">
           <button
             type="button"
-            onClick={() => setEntries([])}
+            onClick={clear}
             className="flex w-full items-center gap-4 rounded-lg px-1 py-3 text-left text-sm font-medium hover:bg-muted"
           >
             <Trash2 className="size-5" />

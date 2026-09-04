@@ -131,6 +131,7 @@ export function contentPagePipeline(
         termIds: 1,
         "metadata.dvdId": 1,
         "metadata.commentPolicy": 1,
+        "metadata.releaseDate": 1,
         channels: 1,
         media: 1,
         terms: 1,
@@ -168,13 +169,15 @@ export function mapContentToVideo(
 ): Video {
   const metadata = toRecord(content.metadata)
   const channels = orderedRelations(content.channels, content.channelIds)
-  const channel =
-    channels.find((item) =>
-      stringArray(toRecord(item.metadata).roles).includes("studio")
-    ) ??
-    channels.find((item) =>
-      stringArray(toRecord(item.metadata).roles).includes("actor")
-    )
+  const actorChannels = channels.filter((item) => {
+    const roles = stringArray(toRecord(item.metadata).roles)
+    return roles.includes("actor") || item.kind === "person"
+  })
+  const studioChannels = channels.filter((item) => {
+    const roles = stringArray(toRecord(item.metadata).roles)
+    return roles.includes("studio") || item.kind === "organization"
+  })
+  const channel = studioChannels[0] ?? actorChannels[0]
   const media = orderedRelations(content.media, content.mediaIds)
   const playable = media
     .filter((item) => item.purpose === "video" || item.purpose === "short")
@@ -195,10 +198,12 @@ export function mapContentToVideo(
   const previewUrl = trailer
     ? staticContentUrl(staticDomain, contentSlug, "preview.mp4")
     : ""
-  const category = orderedRelations(content.terms, content.termIds).find(
-    (item) => item.taxonomy === "category"
-  )
+  const terms = orderedRelations(content.terms, content.termIds)
+  const categories = terms.filter((item) => item.taxonomy === "category")
+  const tags = terms.filter((item) => item.taxonomy === "tag")
+  const category = categories[0]
   const sourceMetadata = toRecord(source?.metadata)
+  const releaseDate = optionalDateValue(metadata.releaseDate)
   const id = stringValue(content.slug) || stringValue(content._id)
   const player =
     content.kind === "video" && contentSlug && staticDomain && playlistDomain
@@ -219,8 +224,15 @@ export function mapContentToVideo(
       numberValue(sourceMetadata.duration) ||
       numberValue(toRecord(toRecord(sourceMetadata.hls).media).duration),
     viewCount: numberValue(toRecord(content.stats).viewCount),
+    likeCount: numberValue(toRecord(content.stats).likeCount),
+    dislikeCount: numberValue(toRecord(content.stats).dislikeCount),
     publishedAt: dateValue(content.createdAt),
+    ...(releaseDate ? { releaseDate } : {}),
     category: stringValue(category?.name) || "Other",
+    actors: actorChannels.map(mapVideoChannel),
+    studios: studioChannels.map(mapVideoChannel),
+    categories: categories.map(mapVideoTerm),
+    tags: tags.map(mapVideoTerm),
     ...(content.kind === "short" && mediaUrl(source)
       ? { playbackUrl: mediaUrl(source) }
       : {}),
@@ -228,13 +240,7 @@ export function mapContentToVideo(
     ...(player ? { player } : {}),
     ...(channel
       ? {
-          channel: {
-            id: stringValue(channel._id),
-            name: stringValue(channel.name),
-            handle: `@${stringValue(channel.handle).replace(/^@/, "")}`,
-            avatarUrl: stringValue(channel.avatarUrl) || null,
-            verified: Boolean(channel.verifiedAt),
-          },
+          channel: mapVideoChannel(channel),
         }
       : {}),
   }
@@ -328,6 +334,15 @@ export function dateValue(value: unknown) {
   }
   return new Date(0).toISOString()
 }
+function optionalDateValue(value: unknown) {
+  if (value instanceof Date && !Number.isNaN(value.getTime()))
+    return value.toISOString()
+  if (typeof value === "string" || typeof value === "number") {
+    const date = new Date(value)
+    if (!Number.isNaN(date.getTime())) return date.toISOString()
+  }
+  return undefined
+}
 export function plainText(value: string) {
   return value
     .replace(/<[^>]*>/g, " ")
@@ -347,6 +362,22 @@ function orderedRelations(value: unknown, idsValue: unknown) {
       (a, b) =>
         ids.indexOf(stringValue(a._id)) - ids.indexOf(stringValue(b._id))
     )
+}
+function mapVideoChannel(channel: Record<string, unknown>) {
+  return {
+    id: stringValue(channel._id),
+    name: stringValue(channel.name),
+    handle: `@${stringValue(channel.handle).replace(/^@/, "")}`,
+    avatarUrl: stringValue(channel.avatarUrl) || null,
+    verified: Boolean(channel.verifiedAt),
+  }
+}
+function mapVideoTerm(term: Record<string, unknown>) {
+  return {
+    id: stringValue(term._id),
+    name: stringValue(term.name),
+    slug: stringValue(term.slug),
+  }
 }
 function qualityRank(value: unknown) {
   return value === "original" ? 10000 : Number(value) || 0

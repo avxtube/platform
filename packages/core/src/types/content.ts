@@ -74,8 +74,15 @@ export type Video = {
   thumbnailUrl: string
   durationSeconds: number
   viewCount: number
+  likeCount?: number
+  dislikeCount?: number
   publishedAt: string
+  releaseDate?: string
   category: string
+  actors?: VideoChannel[]
+  studios?: VideoChannel[]
+  categories?: VideoTerm[]
+  tags?: VideoTerm[]
   playbackUrl?: string
   previewUrl?: string
   player?: {
@@ -86,6 +93,12 @@ export type Video = {
     }
   }
   channel?: VideoChannel
+}
+
+export type VideoTerm = {
+  id: string
+  name: string
+  slug: string
 }
 
 export type VideosResponse = {
@@ -176,6 +189,7 @@ export type WatchData = {
   relatedNextCursor: string | null
   comments: WatchComment[]
   commentsNextCursor: string | null
+  commentsTotal: number
 }
 
 export type CursorPage<Item> = {
@@ -190,6 +204,14 @@ export type CollectionResponse = {
   kind: CollectionKind
   videos: Video[]
   total: number
+}
+
+export type VideoInteraction = {
+  reaction: "like" | "dislike" | null
+  watchLater: boolean
+  saved: boolean
+  likeCount: number
+  dislikeCount: number
 }
 
 export type HistoryContentType = "video" | "short" | "podcast" | "music"

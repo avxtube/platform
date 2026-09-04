@@ -9,6 +9,7 @@ export * from "./setting.model"
 
 // Channel
 export * from "./channel.model"
+export * from "./comment.model"
 export * from "./channel-profile.model"
 export * from "./subscription.model"
 export * from "./term.model"
@@ -18,3 +19,4 @@ export * from "./media.model"
 // Content
 export * from "./content.model"
 export * from "./queue-import.model"
+export * from "./user-content-activity.model"

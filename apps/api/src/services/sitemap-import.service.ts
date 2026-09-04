@@ -1,4 +1,4 @@
-import { createHash } from "node:crypto"
+import { randomUUID } from "node:crypto"
 
 import { ContentModel, QueueImportModel } from "@workspace/db/models"
 
@@ -66,10 +66,10 @@ export async function importMissavSitemap(
     ? await QueueImportModel.bulkWrite(
         missing.map((item) => ({
           updateOne: {
-            filter: { _id: queueId(item.slug) },
+            filter: { dvdId: item.slug },
             update: {
               $setOnInsert: {
-                _id: queueId(item.slug),
+                _id: randomUUID(),
                 status: "pending",
                 url: item.url,
                 dvdId: item.slug,
@@ -206,10 +206,6 @@ async function readLimitedText(response: Response, maxBytes: number) {
     text += decoder.decode(value, { stream: true })
   }
   return text + decoder.decode()
-}
-
-function queueId(slug: string) {
-  return createHash("sha256").update(`${sourceRef}:${slug}`).digest("hex")
 }
 
 function invalid(message: string) {

@@ -241,6 +241,9 @@ importers:
       '@workspace/core':
         specifier: workspace:*
         version: link:../../packages/core
+      '@workspace/data-table':
+        specifier: workspace:*
+        version: file:packages/data-table(@date-fns/tz@1.5.0)(@types/react-dom@19.2.3(@types/react@19.2.15))(@types/react@19.2.15)(react-dom@19.2.7(react@19.2.7))(react-is@16.13.1)(typescript@5.9.3)
       '@workspace/i18n':
         specifier: workspace:*
         version: link:../../packages/i18n

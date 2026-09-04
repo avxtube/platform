@@ -13,7 +13,7 @@
   "watchNotFoundDescription": "This video may have been removed, moved, or is not published yet.",
   "backHome": "Back to home",
   "follow": "Follow",
-  "following": "Following",
+  "followingLabel": "Following",
   "followers": "{count} followers",
   "videoCount": "{count} videos",
   "actorsTitle": "Actors",
@@ -70,11 +70,17 @@
   "addComment": "Add a comment...",
   "cancel": "Cancel",
   "comment": "Comment",
+  "commentFailed": "Unable to save the comment. Please try again.",
   "pinned": "Pinned by the actor",
   "reply": "Reply",
   "replyTo": "Reply to {name}",
   "replies": "{count} replies",
   "showMore": "Show more",
+  "showLess": "Show less",
+  "detailsActors": "Actors",
+  "detailsStudios": "Studios",
+  "detailsCategories": "Categories",
+  "detailsTags": "Tags",
   "autoplay": "Autoplay",
   "loadMore": "Load more videos",
   "loadMoreComments": "Load more comments",
@@ -168,6 +174,11 @@
     "emptyActors": "No trending actors are available right now.",
     "emptyShorts": "No trending Shorts are available right now.",
     "emptyVideos": "No trending videos are available right now."
+  },
+  "latest": {
+    "title": "Latest videos",
+    "description": "Browse recently published videos, ordered from newest to oldest.",
+    "empty": "No published videos are available right now."
   },
   "following": {
     "title": "Following",

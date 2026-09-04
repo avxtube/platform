@@ -20,6 +20,8 @@ export const mockActors: Actor[] = actorDetails.map(([id, bio], index) => {
   const channel = mockVideos.find((video) => video.channel.id === id)!.channel;
   return {
     ...channel,
+    kind: "person",
+    gender: "female",
     bio,
     followerCount: [842000, 603000, 318000, 1400000, 415000, 2400000, 726000, 954000, 521000, 1100000, 387000, 648000][index]!,
     videoCount: [46, 176, 128, 92, 89, 302, 114, 208, 76, 163, 58, 137][index]!,

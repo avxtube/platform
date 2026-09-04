@@ -73,6 +73,8 @@ export type Channel = ChannelSummary & {
   metadata?: ChannelMetadata
 }
 export type Actor = VideoChannel & {
+  kind: ChannelKind
+  gender?: ChannelGender
   bio: string
   followerCount: number
   videoCount: number

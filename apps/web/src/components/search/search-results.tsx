@@ -6,6 +6,7 @@ import { BadgeCheck } from "lucide-react"
 import { getTranslations } from "next-intl/server"
 
 import { PlaylistShelf } from "@/components/home/playlist-shelf"
+import { ChannelImage } from "@/components/channel/channel-image"
 import { TrendingShortsCarousel } from "@/components/trending/trending-shorts-carousel"
 import { Link } from "@/i18n/navigation"
 
@@ -37,9 +38,11 @@ export async function SearchResults({
                 href={`/channel/${actor.handle.replace(/^@/, "")}`}
                 className="w-28 shrink-0 text-center"
               >
-                <img
+                <ChannelImage
                   src={actor.coverUrl}
-                  alt=""
+                  kind={actor.kind}
+                  gender={actor.gender}
+                  alt={actor.name}
                   className="mx-auto aspect-square w-24 rounded-full object-cover"
                 />
                 <span className="mt-2 flex items-center justify-center gap-1 text-sm font-semibold">

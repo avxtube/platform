@@ -1,0 +1,21 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" role="img" aria-labelledby="title">
+  <title id="title">Male profile placeholder</title>
+  <defs>
+    <linearGradient id="bg" x1="48" y1="24" x2="464" y2="488" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#38bdf8"/>
+      <stop offset="1" stop-color="#2563eb"/>
+    </linearGradient>
+    <linearGradient id="shirt" x1="256" y1="302" x2="256" y2="512" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#f8fafc"/>
+      <stop offset="1" stop-color="#cbd5e1"/>
+    </linearGradient>
+  </defs>
+  <rect width="512" height="512" rx="96" fill="url(#bg)"/>
+  <circle cx="256" cy="195" r="104" fill="#d8aa8e"/>
+  <path d="M155 184c5-79 46-119 107-119 65 0 105 42 111 119-24-24-53-40-88-48-33 25-76 38-130 38v10Z" fill="#172554"/>
+  <path d="M91 512c15-128 77-197 165-197s150 69 165 197H91Z" fill="url(#shirt)"/>
+  <path d="M204 285c14 14 31 21 52 21s38-7 52-21v57c-14 19-31 29-52 29s-38-10-52-29v-57Z" fill="#cf9b7e"/>
+  <circle cx="218" cy="205" r="8" fill="#1e293b"/>
+  <circle cx="294" cy="205" r="8" fill="#1e293b"/>
+  <path d="M228 252c17 10 39 10 56 0" fill="none" stroke="#8b4e43" stroke-width="8" stroke-linecap="round"/>
+</svg>

@@ -141,19 +141,19 @@ export async function getFollowingProfiles(cursor = 0, limit = 10, requestHeader
   return fetchJson<CursorPage<FollowingProfile>>(url, requestHeaders);
 }
 
-export async function getFollowingFeed(cursor = 0, limit = 8): Promise<CursorPage<Video>> {
+export async function getFollowingFeed(cursor = 0, limit = 20, requestHeaders?: HeadersInit): Promise<CursorPage<Video>> {
   const url = new URL(`/${apiVersion}/following/feed`, apiOrigin);
   url.searchParams.set("cursor", String(cursor));
   url.searchParams.set("limit", String(limit));
-  return fetchJson<CursorPage<Video>>(url);
+  return fetchJson<CursorPage<Video>>(url, requestHeaders);
 }
 
-export async function getCollection(kind: CollectionKind): Promise<CollectionResponse> {
-  return fetchJson<CollectionResponse>(new URL(`/${apiVersion}/collections/${kind}`, apiOrigin));
+export async function getCollection(kind: CollectionKind, requestHeaders?: HeadersInit): Promise<CollectionResponse> {
+  return fetchJson<CollectionResponse>(new URL(`/${apiVersion}/collections/${kind}`, apiOrigin), requestHeaders);
 }
 
-export async function getHistory(): Promise<HistoryResponse> {
-  return fetchJson<HistoryResponse>(new URL(`/${apiVersion}/collections/history`, apiOrigin));
+export async function getHistory(requestHeaders?: HeadersInit): Promise<HistoryResponse> {
+  return fetchJson<HistoryResponse>(new URL(`/${apiVersion}/collections/history`, apiOrigin), requestHeaders);
 }
 
 export async function searchContent(params: Record<string, string>): Promise<SearchResponse> {

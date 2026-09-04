@@ -1,10 +1,11 @@
 import mongoose, { type InferSchemaType, type Model } from "mongoose";
+import { v4 as uuidv4 } from "uuid";
 
 const { Schema, model, models } = mongoose;
 
 const subscriptionSchema = new Schema(
   {
-    _id: { type: String, required: true },
+    _id: { type: String, required: true, default: uuidv4 },
     userId: { type: String, ref: "User", required: true },
     channelId: { type: String, ref: "Channel", required: true },
     notifications: { type: String, enum: ["all", "personalized", "none"], default: "personalized" },

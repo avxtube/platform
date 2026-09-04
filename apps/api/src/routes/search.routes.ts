@@ -38,6 +38,18 @@ router.get("/", async (req, res) => {
     ...publicChannelFilter(),
     $or: [{ name: pattern }, { handle: pattern }],
   }
+  const profileSearch = {
+    ...publicChannelFilter(),
+    $and: [
+      { $or: [{ name: pattern }, { handle: pattern }] },
+      {
+        $or: [
+          { kind: "person", "metadata.roles": "actor" },
+          { kind: "organization", "metadata.roles": "studio" },
+        ],
+      },
+    ],
+  }
   if (q) {
     const [channelIds, termIds] = await Promise.all([
       ChannelModel.distinct("_id", channelSearch),
@@ -109,10 +121,7 @@ router.get("/", async (req, res) => {
       getPublicContents(filter, 50, 0, sort),
       ContentModel.countDocuments(filter),
       type === "all" && q
-        ? getPublicChannels(
-            { ...channelSearch, kind: "person", "metadata.roles": "actor" },
-            8
-          )
+        ? getPublicChannels(profileSearch, 8)
         : [],
       getContentMappers(),
     ])

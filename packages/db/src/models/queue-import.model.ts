@@ -1,4 +1,5 @@
 import mongoose, { type InferSchemaType, type Model } from "mongoose";
+import { v4 as uuidv4 } from "uuid";
 
 const { Schema, model, models } = mongoose;
 
@@ -11,7 +12,7 @@ export const IMPORT_STATUSES = [
 
 const queueImportSchema = new Schema(
   {
-    _id: { type: String, required: true },
+    _id: { type: String, required: true, default: uuidv4 },
     status: { type: String, enum: IMPORT_STATUSES, required: true, default: "pending" },
     url: { type: String, required: true, unique: true },
     ref: { type: String, required: true, index: true },

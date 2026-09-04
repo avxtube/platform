@@ -1,16 +1,45 @@
-import type { FollowingProfile } from "@workspace/core/types"
+import type { FollowingProfile, Video } from "@workspace/core/types"
 import {
   ChannelModel,
   ContentModel,
   SubscriptionModel,
 } from "@workspace/db/models"
 import type { PipelineStage } from "mongoose"
-import { isRecord, stringArray, stringValue } from "./content-video.service"
+import {
+  getContentMappers,
+  getPublicContents,
+  isRecord,
+  publicVideoFilter,
+  stringArray,
+  stringValue,
+} from "./content-video.service"
 
 type FollowingPage = {
   items: FollowingProfile[]
   nextCursor: string | null
   total: number
+}
+
+export async function getUserFollowingFeed(
+  userId: string,
+  limit = 20
+): Promise<{ items: Video[]; nextCursor: null; total: number }> {
+  const channelIds = await SubscriptionModel.distinct("channelId", { userId })
+  if (!channelIds.length) return { items: [], nextCursor: null, total: 0 }
+  const filter = {
+    ...publicVideoFilter(),
+    channelIds: { $in: channelIds },
+  }
+  const [contents, total, { mapVideo }] = await Promise.all([
+    getPublicContents(filter, Math.min(Math.max(limit, 1), 20)),
+    ContentModel.countDocuments(filter),
+    getContentMappers(),
+  ])
+  return {
+    items: contents.map(mapVideo),
+    nextCursor: null,
+    total,
+  }
 }
 
 export async function getUserFollowingProfiles(

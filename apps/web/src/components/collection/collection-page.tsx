@@ -6,11 +6,14 @@ import { VideoGrid } from "@/components/video"
 import { ViewerSignInPrompt } from "@/components/viewer/viewer-sign-in-prompt"
 import { getCurrentUser } from "@workspace/auth/server"
 import { getCollection } from "@workspace/services/queries/video"
+import { headers } from "next/headers"
 
 export async function UserCollectionPage({ kind, icon, locale }: { kind: CollectionKind; icon: LucideIcon; locale: Locale }) {
   const user = await getCurrentUser()
   if (!user.userId) return <ViewerSignInPrompt kind={kind} locale={locale} />
-  const result = await getCollection(kind).catch(() => ({ kind, videos: [], total: 0 }))
+  const requestHeaders = await headers()
+  const cookie = requestHeaders.get("cookie")
+  const result = await getCollection(kind, cookie ? { cookie } : undefined).catch(() => ({ kind, videos: [], total: 0 }))
   return <CollectionPage kind={kind} icon={icon} videos={result.videos} locale={locale} />
 }
 

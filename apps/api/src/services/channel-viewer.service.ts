@@ -159,6 +159,8 @@ export function mapActor(row: Record<string, unknown>): Actor {
     id: channel.id,
     name: channel.name,
     handle: `@${channel.handle}`,
+    kind: channel.kind,
+    gender: channel.metadata?.gender,
     avatarUrl: channel.avatarUrl,
     verified: channel.verified,
     bio: channel.description,

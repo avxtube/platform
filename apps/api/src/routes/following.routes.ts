@@ -1,11 +1,14 @@
+import { randomUUID } from "node:crypto"
+import { ChannelModel, SubscriptionModel } from "@workspace/db/models"
 import { Router, type Request, type Response } from "express"
 import {
   authenticateUser,
   getRequestActor,
 } from "../middlewares/user-access.middleware"
-import { getUserFollowingProfiles } from "../services/following.service"
-import { mockFollowing } from "../data/mock-following"
-import { mockVideos } from "../data/mock-videos"
+import {
+  getUserFollowingFeed,
+  getUserFollowingProfiles,
+} from "../services/following.service"
 
 const router: Router = Router()
 
@@ -14,24 +17,24 @@ function pageNumber(value: unknown, fallback: number) {
   return Number.isFinite(parsed) ? parsed : fallback
 }
 
-function paginate<Item>(items: Item[], cursorValue: unknown, limitValue: unknown) {
-  const cursor = Math.max(0, pageNumber(cursorValue, 0))
-  const limit = Math.max(1, Math.min(pageNumber(limitValue, 8), 12))
-  const pageItems = items.slice(cursor, cursor + limit)
-  const nextOffset = cursor + pageItems.length
-  return { items: pageItems, nextCursor: nextOffset < items.length ? String(nextOffset) : null, total: items.length }
-}
+router.use(authenticateUser)
 
-router.get("/feed", (req: Request, res: Response) => {
-  const followedIds = new Set(mockFollowing.map((profile) => profile.id))
-  const videos = mockVideos.filter((video) => followedIds.has(video.channel.id))
-  res.status(200).json(paginate(videos, req.query.cursor, req.query.limit))
+router.get("/feed", async (req: Request, res: Response, next) => {
+  try {
+    const result = await getUserFollowingFeed(
+      getRequestActor(res).id,
+      Math.min(Math.max(pageNumber(req.query.limit, 20), 1), 20)
+    )
+    res.status(200).json(result)
+  } catch (error) {
+    next(error)
+  }
 })
 
-router.get("/", authenticateUser, async (req: Request, res: Response, next) => {
+router.get("/", async (req: Request, res: Response, next) => {
   try {
     const cursor = Math.max(0, pageNumber(req.query.cursor, 0))
-    const limit = Math.max(1, Math.min(pageNumber(req.query.limit, 3), 10))
+    const limit = Math.max(1, Math.min(pageNumber(req.query.limit, 20), 100))
     const result = await getUserFollowingProfiles(
       getRequestActor(res).id,
       cursor,
@@ -42,5 +45,83 @@ router.get("/", authenticateUser, async (req: Request, res: Response, next) => {
     next(error)
   }
 })
+
+router.get("/:channelId/status", async (req: Request, res: Response, next) => {
+  try {
+    const subscription = await SubscriptionModel.findOne({
+      userId: getRequestActor(res).id,
+      channelId: req.params.channelId,
+    })
+      .select("notifications")
+      .lean()
+    res.status(200).json({
+      following: Boolean(subscription),
+      notifications: subscription?.notifications ?? "personalized",
+    })
+  } catch (error) {
+    next(error)
+  }
+})
+
+router.put("/:channelId", async (req: Request, res: Response, next) => {
+  try {
+    const channelId = req.params.channelId
+    const channel = await ChannelModel.findOne({
+      _id: channelId,
+      status: "active",
+      deletedAt: null,
+    })
+      .select("_id")
+      .lean()
+    if (!channel) {
+      res.status(404).json({ error: "Channel not found" })
+      return
+    }
+    const requested = isRecord(req.body) ? req.body.notifications : undefined
+    const notifications =
+      requested === "all" || requested === "none" ? requested : "personalized"
+    const result = await SubscriptionModel.updateOne(
+      { userId: getRequestActor(res).id, channelId },
+      {
+        $set: { notifications },
+        $setOnInsert: {
+          _id: randomUUID(),
+          userId: getRequestActor(res).id,
+          channelId,
+        },
+      },
+      { upsert: true }
+    )
+    if (result.upsertedCount)
+      await ChannelModel.updateOne(
+        { _id: channelId },
+        { $inc: { "stats.subscriberCount": 1 } }
+      )
+    res.status(200).json({ following: true, notifications })
+  } catch (error) {
+    next(error)
+  }
+})
+
+router.delete("/:channelId", async (req: Request, res: Response, next) => {
+  try {
+    const result = await SubscriptionModel.deleteOne({
+      userId: getRequestActor(res).id,
+      channelId: req.params.channelId,
+    })
+    if (result.deletedCount)
+      await ChannelModel.updateOne(
+        { _id: req.params.channelId },
+        { $inc: { "stats.subscriberCount": -1 } }
+      )
+    res.status(204).end()
+  } catch (error) {
+    next(error)
+  }
+})
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return Boolean(value) && typeof value === "object" && !Array.isArray(value)
+}
 
 export default router

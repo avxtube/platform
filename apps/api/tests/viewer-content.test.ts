@@ -214,6 +214,50 @@ test("minimal content and shorts with no channel are valid", () => {
   assert.equal(short.likeCount, 10)
   assert.equal(short.commentPolicy, "disabled")
 })
+test("video details expose release date, channels, categories, and tags", () => {
+  const video = mapContentToVideo({
+    _id: "video-id",
+    metadata: { releaseDate: "2025-04-03" },
+    channelIds: ["actor-id", "studio-id"],
+    channels: [
+      {
+        _id: "studio-id",
+        name: "Studio",
+        handle: "studio",
+        kind: "organization",
+        metadata: { roles: ["studio"] },
+      },
+      {
+        _id: "actor-id",
+        name: "Actor",
+        handle: "actor",
+        kind: "person",
+        metadata: { roles: ["actor"] },
+      },
+    ],
+    termIds: ["category-id", "tag-id"],
+    terms: [
+      {
+        _id: "tag-id",
+        name: "Tag",
+        slug: "tag",
+        taxonomy: "tag",
+      },
+      {
+        _id: "category-id",
+        name: "Category",
+        slug: "category",
+        taxonomy: "category",
+      },
+    ],
+  })
+  assert.equal(video.releaseDate, "2025-04-03T00:00:00.000Z")
+  assert.deepEqual(video.actors?.map((item) => item.name), ["Actor"])
+  assert.deepEqual(video.studios?.map((item) => item.name), ["Studio"])
+  assert.deepEqual(video.categories?.map((item) => item.name), ["Category"])
+  assert.deepEqual(video.tags?.map((item) => item.name), ["Tag"])
+  assert.equal(video.channel?.name, "Studio")
+})
 test("channel statistics are joined from public content, not stale counters", () => {
   const row = {
     _id: "person-id",

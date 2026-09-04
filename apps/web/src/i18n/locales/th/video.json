@@ -13,7 +13,7 @@
   "watchNotFoundDescription": "วิดีโออาจถูกลบ เปลี่ยนที่อยู่ หรือยังไม่ได้เผยแพร่",
   "backHome": "กลับหน้าหลัก",
   "follow": "ติดตาม",
-  "following": "ติดตามแล้ว",
+  "followingLabel": "ติดตามแล้ว",
   "followers": "ผู้ติดตาม {count} คน",
   "videoCount": "วิดีโอ {count} รายการ",
   "actorsTitle": "นักแสดง",
@@ -70,11 +70,17 @@
   "addComment": "เพิ่มความคิดเห็น...",
   "cancel": "ยกเลิก",
   "comment": "แสดงความคิดเห็น",
+  "commentFailed": "ไม่สามารถบันทึกความคิดเห็นได้ กรุณาลองใหม่",
   "pinned": "ปักหมุดโดยนักแสดง",
   "reply": "ตอบกลับ",
   "replyTo": "ตอบกลับ {name}",
   "replies": "การตอบกลับ {count} รายการ",
   "showMore": "แสดงเพิ่มเติม",
+  "showLess": "แสดงน้อยลง",
+  "detailsActors": "นักแสดง",
+  "detailsStudios": "สตูดิโอ",
+  "detailsCategories": "หมวดหมู่",
+  "detailsTags": "แท็ก",
   "autoplay": "เล่นอัตโนมัติ",
   "loadMore": "โหลดวิดีโอเพิ่มเติม",
   "loadMoreComments": "โหลดความคิดเห็นเพิ่มเติม",
@@ -168,6 +174,11 @@
     "emptyActors": "ยังไม่มีนักแสดงที่กำลังมาแรงในขณะนี้",
     "emptyShorts": "ยังไม่มี Shorts ที่กำลังมาแรงในขณะนี้",
     "emptyVideos": "ยังไม่มีวิดีโอที่กำลังมาแรงในขณะนี้"
+  },
+  "latest": {
+    "title": "วิดีโอล่าสุด",
+    "description": "ดูวิดีโอที่เผยแพร่ล่าสุด เรียงจากใหม่ไปเก่า",
+    "empty": "ยังไม่มีวิดีโอที่เผยแพร่ในขณะนี้"
   },
   "following": {
     "title": "การติดตาม",

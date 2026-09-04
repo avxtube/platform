@@ -23,7 +23,7 @@ export async function ChannelHeader({ channel, locale }: { channel: Channel; loc
           <p className="mt-2 text-sm text-muted-foreground">@{channel.handle} • {t("subscribers", { count: number.format(channel.subscriberCount) })} • {t("videoCount", { count: channel.videoCount })}</p>
           <div className="flex items-end gap-2"><p className="mt-3 line-clamp-1 max-w-3xl text-sm leading-6 text-muted-foreground">{channel.description}</p><ChannelInfoDialog channel={channel} /></div>
           {channel.links[0] ? <a href={channel.links[0].url} target="_blank" rel="noreferrer" className="mt-2 inline-block text-sm font-medium text-primary hover:underline">{channel.links[0].label}</a> : null}
-          <div className="mt-4 flex flex-wrap gap-2"><FollowChannelButton initialFollowing={channel.isFollowing} />{channel.membershipEnabled ? <button type="button" className="flex items-center gap-2 rounded-full bg-muted px-4 py-2.5 text-sm font-semibold hover:bg-muted/80"><CircleDollarSign className="size-4" />{t("membership")}</button> : null}</div>
+          <div className="mt-4 flex flex-wrap gap-2"><FollowChannelButton channelId={channel.id} initialFollowing={channel.isFollowing} />{channel.membershipEnabled ? <button type="button" className="flex items-center gap-2 rounded-full bg-muted px-4 py-2.5 text-sm font-semibold hover:bg-muted/80"><CircleDollarSign className="size-4" />{t("membership")}</button> : null}</div>
         </div>
       </div>
     </header>

@@ -1,0 +1,17 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" role="img" aria-labelledby="title">
+  <title id="title">Studio placeholder</title>
+  <defs>
+    <linearGradient id="bg" x1="48" y1="24" x2="464" y2="488" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#334155"/>
+      <stop offset="1" stop-color="#0f172a"/>
+    </linearGradient>
+    <linearGradient id="building" x1="256" y1="112" x2="256" y2="448" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#f8fafc"/>
+      <stop offset="1" stop-color="#94a3b8"/>
+    </linearGradient>
+  </defs>
+  <rect width="512" height="512" rx="96" fill="url(#bg)"/>
+  <path d="M112 432h288M145 432V183l111-72 111 72v249M210 432V319h92v113" fill="none" stroke="url(#building)" stroke-width="32" stroke-linecap="round" stroke-linejoin="round"/>
+  <path d="M202 224h1M256 224h1M310 224h1M202 276h1M256 276h1M310 276h1" fill="none" stroke="#e2e8f0" stroke-width="24" stroke-linecap="round"/>
+  <circle cx="256" cy="166" r="23" fill="#f43f5e"/>
+</svg>

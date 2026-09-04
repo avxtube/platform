@@ -17,8 +17,8 @@ export default async function FollowingPage({ params }: { params: Promise<{ loca
   const requestHeaders = await headers()
   const cookie = requestHeaders.get("cookie")
   const [profiles, feed, t] = await Promise.all([
-    getFollowingProfiles(0, 10, cookie ? { cookie } : undefined).catch(() => ({ items: [], nextCursor: null, total: 0 })),
-    getFollowingFeed(0, 8).catch(() => ({ items: [], nextCursor: null, total: 0 })),
+    getFollowingProfiles(0, 100, cookie ? { cookie } : undefined).catch(() => ({ items: [], nextCursor: null, total: 0 })),
+    getFollowingFeed(0, 20, cookie ? { cookie } : undefined).catch(() => ({ items: [], nextCursor: null, total: 0 })),
     getTranslations({ locale, namespace: "video.following" }),
   ])
   return <div className="space-y-10 pb-8"><header className="flex items-center gap-3"><span className="grid size-11 place-items-center rounded-full bg-primary/10 text-primary"><UsersRound className="size-6" /></span><div><h1 className="text-2xl font-black tracking-tight">{t("title")}</h1><p className="text-sm text-muted-foreground">{t("description", { count: profiles.total })}</p></div></header>{profiles.items.length ? <FollowingProfileCarousel profiles={profiles.items} /> : <p className="rounded-xl border border-dashed py-12 text-center text-sm text-muted-foreground">{t("emptyProfiles")}</p>}<FollowingVideoFeed initialPage={feed} /></div>

@@ -23,7 +23,7 @@ export default async function ActorsPage() {
             <Link href={`/channel/${actor.handle.replace(/^@/, "")}`} className="block h-28 overflow-hidden bg-muted">
               <img src={actor.coverUrl} alt="" className="size-full object-cover" />
             </Link>
-            <div className="p-4"><div className="flex items-start justify-between gap-3"><div className="min-w-0"><Link href={`/channel/${actor.handle.replace(/^@/, "")}`} className="flex items-center gap-1 font-semibold hover:text-primary">{actor.name}{actor.verified ? <BadgeCheck className="size-4" /> : null}</Link><p className="text-xs text-muted-foreground">{actor.handle} • {t("followers", { count: Intl.NumberFormat(undefined, { notation: "compact" }).format(actor.followerCount) })}</p></div><FollowActorButton initialFollowing={actor.isFollowing} /></div><p className="mt-4 line-clamp-2 text-sm text-muted-foreground">{actor.bio}</p></div>
+            <div className="p-4"><div className="flex items-start justify-between gap-3"><div className="min-w-0"><Link href={`/channel/${actor.handle.replace(/^@/, "")}`} className="flex items-center gap-1 font-semibold hover:text-primary">{actor.name}{actor.verified ? <BadgeCheck className="size-4" /> : null}</Link><p className="text-xs text-muted-foreground">{actor.handle} • {t("followers", { count: Intl.NumberFormat(undefined, { notation: "compact" }).format(actor.followerCount) })}</p></div><FollowActorButton channelId={actor.id} initialFollowing={actor.isFollowing} /></div><p className="mt-4 line-clamp-2 text-sm text-muted-foreground">{actor.bio}</p></div>
           </article>
         ))}
       </div>
