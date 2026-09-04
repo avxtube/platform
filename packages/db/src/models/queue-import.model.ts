@@ -14,7 +14,8 @@ const queueImportSchema = new Schema(
     _id: { type: String, required: true },
     status: { type: String, enum: IMPORT_STATUSES, required: true, default: "pending" },
     url: { type: String, required: true, unique: true },
-    dvdId: { type: String, unique: true },
+    ref: { type: String, required: true, index: true },
+    dvdId: { type: String, required: true, unique: true },
     workerId: { type: String },
     startedAt: { type: Date },
     failedAt: { type: Date },
@@ -23,6 +24,8 @@ const queueImportSchema = new Schema(
   },
   { timestamps: true, versionKey: false, collection: "queue_imports" },
 );
+
+queueImportSchema.index({ status: 1, createdAt: 1 });
 
 export type QueueImportSchemaType = InferSchemaType<typeof queueImportSchema>;
 

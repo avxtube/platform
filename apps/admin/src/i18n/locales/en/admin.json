@@ -29,6 +29,41 @@
   "missavProxyImportNotice": "MissAV: saving registers source URLs and media descriptors for proxy testing without downloads or uploads. Previews may remain unavailable until a proxy is implemented.",
   "quickImportSuccess": "The video was imported and saved as a draft.",
   "importFailed": "Unable to import data.",
+  "sitemapImport": {
+    "action": "Import sitemap",
+    "eyebrow": "Import queue",
+    "title": "MissAV sitemap import",
+    "description": "Queue new English MissAV URLs without importing the videos yet. Existing content and queued DVD IDs are skipped in bulk.",
+    "back": "Back to videos",
+    "url": "Sitemap URL",
+    "urlHelp": "Only HTTPS MissAV sitemap XML URLs are accepted. All item domains are normalized to missav.ai.",
+    "submit": "Read and queue",
+    "importing": "Reading sitemap...",
+    "failed": "Unable to import this sitemap.",
+    "queueTitle": "Pending import queue",
+    "queueTotal": "{count} total entries",
+    "queueEmpty": "The import queue is empty.",
+    "dvdId": "DVD ID / slug",
+    "source": "Source",
+    "statusLabel": "Status",
+    "created": "Added",
+    "status": {
+      "pending": "Pending",
+      "processing": "Processing",
+      "completed": "Completed",
+      "failed": "Failed"
+    },
+    "summary": {
+      "discovered": "URLs found",
+      "eligible": "Eligible /en/ URLs",
+      "existingContents": "Already in contents",
+      "existingQueue": "Already queued",
+      "skippedNonEnglish": "Other languages skipped",
+      "skippedEnglishSubtitle": "English subtitle skipped",
+      "skippedInvalid": "Invalid URLs skipped",
+      "queued": "New entries queued"
+    }
+  },
   "editor": {
     "toolbar": "Text formatting",
     "editor": "Post body editor",

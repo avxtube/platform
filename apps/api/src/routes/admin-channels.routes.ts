@@ -13,6 +13,40 @@ const router: Router = Router()
 
 router.use(authenticateUser, requireAdmin)
 
+router.post(
+  "/check",
+  async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      if (!isRecord(req.body) || !Array.isArray(req.body.channels)) {
+        throw badRequest("channels must be an array")
+      }
+      if (req.body.channels.length > 50)
+        throw badRequest("channels must contain at most 50 items")
+      const requested = uniqueRequests(
+        req.body.channels.map(parseRequestedChannel)
+      )
+      const checked = await Promise.all(
+        requested.map(async (item) => {
+          const exactName = new RegExp(`^${escapeRegExp(item.name)}$`, "i")
+          const entityKind = item.kind === "actor" ? "person" : "organization"
+          const filter: Record<string, unknown> = {
+            kind: { $in: [entityKind, item.kind] },
+            name: exactName,
+            deletedAt: null,
+          }
+          const channel = await ChannelModel.findOne(filter).lean()
+          return channel
+            ? { key: item.key, id: channel._id, name: channel.name }
+            : null
+        })
+      )
+      res.status(200).json({ channels: checked.filter(Boolean) })
+    } catch (error) {
+      next(error)
+    }
+  }
+)
+
 // Content editor search: kind here is a role, not Channel.kind.
 router.get("/", async (req: Request, res: Response, next: NextFunction) => {
   try {

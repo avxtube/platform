@@ -17,3 +17,4 @@ export * from "./media.model"
 
 // Content
 export * from "./content.model"
+export * from "./queue-import.model"

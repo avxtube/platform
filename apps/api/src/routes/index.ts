@@ -22,6 +22,7 @@ import adminTermsRoutes from "./admin-terms.routes"
 import adminStoragesRoutes from "./admin-storages.routes"
 import adminMediaRoutes from "./admin-media.routes"
 import adminSettingsRoutes from "./admin-settings.routes"
+import adminImportsRoutes from "./admin-imports.routes"
 import mediaRoutes from "./media.routes"
 
 const router: Router = Router()
@@ -46,6 +47,7 @@ router.use("/admin/terms", adminTermsRoutes)
 router.use("/admin/storages", adminStoragesRoutes)
 router.use("/admin/media", adminMediaRoutes)
 router.use("/admin/settings", adminSettingsRoutes)
+router.use("/admin/imports", adminImportsRoutes)
 router.use("/media", mediaRoutes)
 
 // Health check endpoint

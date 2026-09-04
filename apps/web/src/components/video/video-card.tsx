@@ -48,6 +48,8 @@ export function VideoCard({
   const [previewPlaying, setPreviewPlaying] = React.useState(false)
   const [previewFailed, setPreviewFailed] = React.useState(false)
   const canPreview = Boolean(video.previewUrl) && !previewFailed
+  const showUncensoredLeak =
+    video.category.trim().toLocaleLowerCase() === "uncensored leak"
 
   React.useEffect(() => {
     const player = previewRef.current
@@ -106,9 +108,11 @@ export function VideoCard({
             />
           ) : null}
           <div className="absolute inset-0 bg-gradient-to-t from-black/45 via-transparent to-transparent" />
-          <span className="absolute top-3 left-3 rounded-full bg-black/55 px-2 py-1 text-[10px] font-semibold text-white backdrop-blur-sm">
-            {video.category}
-          </span>
+          {showUncensoredLeak ? (
+            <span className="absolute top-3 left-3 rounded-full bg-black/55 px-2 py-1 text-[10px] font-semibold text-white backdrop-blur-sm">
+              Uncensored leak
+            </span>
+          ) : null}
           <span
             className={`absolute top-1/2 left-1/2 flex size-11 -translate-x-1/2 -translate-y-1/2 items-center justify-center rounded-full bg-white/90 text-black shadow-xl transition-opacity ${previewPlaying ? "opacity-0" : "opacity-0 group-hover:opacity-100"}`}
           >

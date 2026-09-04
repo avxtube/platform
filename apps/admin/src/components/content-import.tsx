@@ -66,7 +66,10 @@ export function ContentImport({
         | null
       if (!response.ok || !body?.data || body.success === false)
         throw new Error(body?.error ?? t("importFailed"))
-      await onImported(body)
+      await onImported({
+        ...body,
+        url: body.url?.trim() || targetUrl,
+      })
       setUrl("")
       setMessage({
         type: "success",

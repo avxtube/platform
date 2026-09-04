@@ -9,6 +9,7 @@ import type {
   ContentRelations,
 } from "./content"
 import type { AdminStorage } from "./storage"
+import type { QueueImportListResponse } from "./queue-import"
 import type {
   AdvertSettings,
   DomainSettings,
@@ -66,6 +67,19 @@ export async function getStorages(): Promise<AdminStorage[]> {
     new URL("/v1/admin/storages", apiUrl)
   )
   return response.storages
+}
+
+export async function getQueueImports({
+  page = 1,
+  limit = 50,
+}: {
+  page?: number
+  limit?: number
+} = {}): Promise<QueueImportListResponse> {
+  const url = new URL("/v1/admin/imports/queue", apiUrl)
+  url.searchParams.set("page", String(page))
+  url.searchParams.set("limit", String(limit))
+  return fetchAdmin<QueueImportListResponse>(url)
 }
 
 async function fetchAdmin<T>(url: URL, allowNotFound = false): Promise<T> {

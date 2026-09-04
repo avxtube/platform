@@ -34,6 +34,22 @@ export function collectPendingTerms(value: unknown) {
   return [...found.values()]
 }
 
+export function replacePendingTerms(
+  value: unknown,
+  resolved: Map<string, string>
+): unknown {
+  if (typeof value === "string") return resolved.get(value) ?? value
+  if (Array.isArray(value))
+    return value.map((item) => replacePendingTerms(item, resolved))
+  if (!value || typeof value !== "object") return value
+  return Object.fromEntries(
+    Object.entries(value).map(([key, item]) => [
+      key,
+      replacePendingTerms(item, resolved),
+    ])
+  )
+}
+
 function visitStrings(value: unknown, visit: (value: string) => void) {
   if (typeof value === "string") return visit(value)
   if (Array.isArray(value)) return value.forEach((item) => visitStrings(item, visit))

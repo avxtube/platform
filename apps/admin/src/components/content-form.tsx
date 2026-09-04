@@ -57,6 +57,7 @@ import {
 } from "@/components/metadata/pending-channels"
 import {
   collectPendingTerms,
+  replacePendingTerms,
   type PendingTerm,
 } from "@/components/metadata/pending-terms"
 import { AdminMetabox } from "@/components/admin-metabox"
@@ -143,6 +144,7 @@ export function ContentForm({
   async function onSubmit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault()
     setError(null)
+    const form = new FormData(event.currentTarget)
     let customMetadataValue: Record<string, unknown>
     try {
       const parsed: unknown = JSON.parse(customMetadata || "{}")
@@ -155,7 +157,7 @@ export function ContentForm({
     }
 
     const customOnlyMetadata = splitMetadata(kind, customMetadataValue).custom
-    const metadataValue =
+    let metadataValue =
       kind === "post" ? {} : { ...customOnlyMetadata, ...registeredMetadata }
     const missingMetadataField = validateMetadata(kind, metadataValue)
     if (missingMetadataField) {
@@ -167,7 +169,17 @@ export function ContentForm({
       return
     }
 
-    const form = new FormData(event.currentTarget)
+    try {
+      metadataValue = await replaceExistingPendingRelations(metadataValue)
+    } catch (reason) {
+      setError(
+        reason instanceof Error
+          ? reason.message
+          : t("metadataRelationCreateFailed")
+      )
+      return
+    }
+
     const payload = {
       kind,
       title: nullableText(title),
@@ -206,21 +218,23 @@ export function ContentForm({
   async function applyImportedVideo(result: VideoImportResult) {
     const data = result.data
     const remoteImport = prepareMissavMediaImport(result)
-    if (!content) {
+    const importMedia = !content
+    if (importMedia) {
       setStatus("published")
       setVisibility("public")
     }
     const importedSourceUrl = cleanImportedUrl(
       remoteImport?.sourcePageUrl ?? data.sourceUrl ?? result.url ?? ""
     )
-    if (importedSourceUrl) setMediaReferrerUrl(importedSourceUrl)
+    if (importMedia && importedSourceUrl)
+      setMediaReferrerUrl(importedSourceUrl)
 
     const importedVideoUrl =
       remoteImport?.assets.find((asset) => asset.purpose === "video")
         ?.sourceUrl ?? cleanImportedUrl(data.m3u8Url ?? "")
     const videoImportSource = importedSourceUrl || importedVideoUrl
     let preparedVideo: PendingMediaSelection | undefined
-    if (videoImportSource && !remoteImport) {
+    if (importMedia && videoImportSource && !remoteImport) {
       preparedVideo = preparePendingVideoImport({
         sourceUrl: videoImportSource,
         previewUrl: importedVideoUrl || videoImportSource,
@@ -239,7 +253,7 @@ export function ContentForm({
     }
 
     let preparedPoster: PendingMediaSelection | undefined
-    if (data.poster) {
+    if (importMedia && data.poster) {
       const poster = await preparePendingImageFromUrl({
         sourceUrl: cleanImportedUrl(data.poster),
         purpose: "poster",
@@ -261,7 +275,7 @@ export function ContentForm({
       })
     }
     let preparedTrailer: PendingMediaSelection | undefined
-    if (data.trailer) {
+    if (importMedia && data.trailer) {
       preparedTrailer = await preparePendingVideoFromUrl({
         sourceUrl: cleanImportedUrl(data.trailer),
         referrerUrl:
@@ -281,8 +295,8 @@ export function ContentForm({
         return next
       })
     }
-    setMissavImport(remoteImport)
-    if (remoteImport) {
+    setMissavImport(importMedia ? remoteImport : null)
+    if (importMedia && remoteImport) {
       setPendingMedia((current) => {
         const next = { ...current }
         for (const field of ["sourceUrl", "thumbnailUrl", "trailerUrl"]) {
@@ -314,7 +328,7 @@ export function ContentForm({
     const directors = importedNames(data.directors)
     setRegisteredMetadata((current) => ({
       ...current,
-      ...(remoteImport
+      ...(importMedia && remoteImport
         ? { sourceUrl: "", thumbnailUrl: "", trailerUrl: "" }
         : {}),
       ...(data.code ? { dvdId: data.code } : {}),
@@ -322,21 +336,25 @@ export function ContentForm({
       ...(typeof data.duration === "number"
         ? { durationSeconds: data.duration }
         : {}),
-      ...(preparedVideo
-        ? { sourceUrl: preparedVideo.token }
-        : importedVideoUrl
-          ? { sourceUrl: importedVideoUrl }
-          : {}),
-      ...(preparedPoster
-        ? { thumbnailUrl: preparedPoster.token }
-        : data.poster
-          ? { thumbnailUrl: cleanImportedUrl(data.poster) }
-          : {}),
-      ...(preparedTrailer
-        ? { trailerUrl: preparedTrailer.token }
-        : remoteImport && data.trailer
-          ? { trailerUrl: cleanImportedUrl(data.trailer) }
-          : {}),
+      ...(importMedia
+        ? {
+            ...(preparedVideo
+              ? { sourceUrl: preparedVideo.token }
+              : importedVideoUrl
+                ? { sourceUrl: importedVideoUrl }
+                : {}),
+            ...(preparedPoster
+              ? { thumbnailUrl: preparedPoster.token }
+              : data.poster
+                ? { thumbnailUrl: cleanImportedUrl(data.poster) }
+                : {}),
+            ...(preparedTrailer
+              ? { trailerUrl: preparedTrailer.token }
+              : remoteImport && data.trailer
+                ? { trailerUrl: cleanImportedUrl(data.trailer) }
+                : {}),
+          }
+        : {}),
       ...(studios[0]
         ? { studioId: createPendingChannelValue("studio", studios[0]) }
         : {}),
@@ -365,16 +383,20 @@ export function ContentForm({
     } catch {
       // Keep the imported data usable even if the custom JSON was temporarily invalid.
     }
-    for (const field of Object.values(remoteMediaIdFields))
-      delete existingCustom[field]
+    if (importMedia)
+      for (const field of Object.values(remoteMediaIdFields))
+        delete existingCustom[field]
     setCustomMetadata(
       JSON.stringify(
         {
           ...existingCustom,
           ...(directors.length ? { directors } : {}),
           import: {
+            ...(isPlainRecord(existingCustom.import)
+              ? existingCustom.import
+              : {}),
             sourceUrl: importedSourceUrl,
-            ...(remoteImport
+            ...(importMedia && remoteImport
               ? { sourceProvider: "missav", mediaMode: "proxy" }
               : {}),
             parser: result.parser ?? null,
@@ -428,6 +450,51 @@ export function ContentForm({
     } finally {
       setPending(false)
     }
+  }
+
+  async function replaceExistingPendingRelations(
+    metadata: Record<string, unknown>
+  ) {
+    const channels = collectPendingChannels(metadata)
+    const terms = collectPendingTerms(metadata)
+    if (!channels.length && !terms.length) return metadata
+    const [channelResponse, termResponse] = await Promise.all([
+      channels.length
+        ? fetch("/api/v1/admin/channels/check", {
+            method: "POST",
+            headers: { "content-type": "application/json" },
+            body: JSON.stringify({ channels }),
+          })
+        : null,
+      terms.length
+        ? fetch("/api/v1/admin/terms/check", {
+            method: "POST",
+            headers: { "content-type": "application/json" },
+            body: JSON.stringify({ terms }),
+          })
+        : null,
+    ])
+    if (channelResponse && !channelResponse.ok)
+      throw new Error(t("metadataRelationCreateFailed"))
+    if (termResponse && !termResponse.ok)
+      throw new Error(t("metadataRelationCreateFailed"))
+    const channelBody = channelResponse
+      ? ((await channelResponse.json()) as {
+          channels: Array<{ key: string; id: string }>
+        })
+      : { channels: [] }
+    const termBody = termResponse
+      ? ((await termResponse.json()) as {
+          terms: Array<{ key: string; id: string }>
+        })
+      : { terms: [] }
+    const resolved = new Map<string, string>()
+    channelBody.channels.forEach((item) => resolved.set(item.key, item.id))
+    termBody.terms.forEach((item) => resolved.set(item.key, item.id))
+    return replacePendingTerms(
+      replacePendingChannels(metadata, resolved),
+      resolved
+    ) as Record<string, unknown>
   }
 
   async function commitMediaInMetadata(metadata: Record<string, unknown>) {

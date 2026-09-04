@@ -1,7 +1,7 @@
 /* eslint-disable @next/next/no-img-element */
 "use client"
 
-import type { Playlist, WatchData } from "@workspace/core/types"
+import type { Playlist, Video, WatchData } from "@workspace/core/types"
 import { BadgeCheck, LoaderCircle, MessageCircle, X } from "lucide-react"
 import { useTranslations } from "next-intl"
 import * as React from "react"
@@ -205,39 +205,15 @@ export function WatchExperience({
       </div>
       <div className="divide-y sm:space-y-4 sm:divide-y-0">
         {related.items.map((item) => (
-          <Link
+          <RelatedVideoCard
             key={item.id}
-            href={`/watch/${item.id}`}
-            className="group block bg-background sm:flex sm:gap-3"
-          >
-            <div className="relative aspect-video w-full shrink-0 overflow-hidden bg-muted sm:w-40 sm:rounded-lg">
-              <img
-                src={item.thumbnailUrl}
-                alt=""
-                className="size-full object-cover transition-transform group-hover:scale-105"
-              />
-              <span className="absolute right-2 bottom-2 rounded bg-black/80 px-1.5 py-0.5 text-xs font-semibold text-white">
-                {formatDuration(item.durationSeconds)}
-              </span>
-            </div>
-            <div className="min-w-0 p-3 sm:p-0">
-              <h3 className="line-clamp-2 text-sm font-semibold">
-                {item.title}
-              </h3>
-              {item.channel ? (
-                <p className="mt-1 text-xs text-muted-foreground">
-                  {item.channel.name}
-                </p>
-              ) : null}
-              <p className="text-xs text-muted-foreground">
-                {t("views", {
-                  count: Intl.NumberFormat(locale, {
-                    notation: "compact",
-                  }).format(item.viewCount),
-                })}
-              </p>
-            </div>
-          </Link>
+            video={item}
+            viewsLabel={t("views", {
+              count: Intl.NumberFormat(locale, {
+                notation: "compact",
+              }).format(item.viewCount),
+            })}
+          />
         ))}
       </div>
       <div ref={relatedLoadMoreRef} aria-hidden="true" className="h-px" />
@@ -288,6 +264,87 @@ export function WatchExperience({
   )
 }
 
+function RelatedVideoCard({
+  video,
+  viewsLabel,
+}: {
+  video: Video
+  viewsLabel: string
+}) {
+  const previewRef = React.useRef<HTMLVideoElement>(null)
+  const [previewActive, setPreviewActive] = React.useState(false)
+  const [previewPlaying, setPreviewPlaying] = React.useState(false)
+  const [previewFailed, setPreviewFailed] = React.useState(false)
+  const canPreview = Boolean(video.previewUrl) && !previewFailed
+
+  React.useEffect(() => {
+    const player = previewRef.current
+    if (!player) return
+    if (!previewActive) {
+      player.pause()
+      player.currentTime = 0
+      return
+    }
+    player.currentTime = 0
+    void player.play().catch(() => setPreviewPlaying(false))
+  }, [previewActive])
+
+  return (
+    <Link
+      href={`/watch/${video.id}`}
+      onPointerEnter={(event) => {
+        if (event.pointerType === "mouse" && canPreview)
+          setPreviewActive(true)
+      }}
+      onPointerLeave={() => {
+        setPreviewPlaying(false)
+        setPreviewActive(false)
+      }}
+      className="group block bg-background sm:flex sm:gap-3"
+    >
+      <div className="relative aspect-video w-full shrink-0 overflow-hidden bg-muted sm:w-40 sm:rounded-lg">
+        <img
+          src={video.thumbnailUrl}
+          alt=""
+          loading="lazy"
+          className={`size-full object-cover transition-[transform,opacity] duration-200 group-hover:scale-105 ${previewPlaying ? "opacity-0" : "opacity-100"}`}
+        />
+        {canPreview ? (
+          <video
+            ref={previewRef}
+            src={video.previewUrl}
+            muted
+            loop
+            playsInline
+            preload="none"
+            poster={video.thumbnailUrl}
+            aria-hidden="true"
+            onPlaying={() => setPreviewPlaying(true)}
+            onError={() => {
+              setPreviewFailed(true)
+              setPreviewActive(false)
+              setPreviewPlaying(false)
+            }}
+            className={`absolute inset-0 size-full object-cover transition-opacity duration-200 ${previewPlaying ? "opacity-100" : "opacity-0"}`}
+          />
+        ) : null}
+        <span className="absolute right-2 bottom-2 rounded bg-black/80 px-1.5 py-0.5 text-xs font-semibold text-white">
+          {formatDuration(video.durationSeconds)}
+        </span>
+      </div>
+      <div className="min-w-0 p-3 sm:p-0">
+        <h3 className="line-clamp-2 text-sm font-semibold">{video.title}</h3>
+        {video.channel ? (
+          <p className="mt-1 text-xs text-muted-foreground">
+            {video.channel.name}
+          </p>
+        ) : null}
+        <p className="text-xs text-muted-foreground">{viewsLabel}</p>
+      </div>
+    </Link>
+  )
+}
+
 function initials(name: string) {
   return name
     .split(/\s+/)
@@ -296,9 +353,13 @@ function initials(name: string) {
     .slice(0, 2)
 }
 function formatDuration(seconds: number) {
-  const hours = Math.floor(seconds / 3600)
-  const minutes = Math.floor((seconds % 3600) / 60)
-  const rest = seconds % 60
+  const totalSeconds = Math.max(
+    0,
+    Math.floor(Number.isFinite(seconds) ? seconds : 0)
+  )
+  const hours = Math.floor(totalSeconds / 3600)
+  const minutes = Math.floor((totalSeconds % 3600) / 60)
+  const rest = totalSeconds % 60
   return hours
     ? `${hours}:${String(minutes).padStart(2, "0")}:${String(rest).padStart(2, "0")}`
     : `${minutes}:${String(rest).padStart(2, "0")}`

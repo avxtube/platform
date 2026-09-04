@@ -29,6 +29,41 @@
   "missavProxyImportNotice": "MissAV: เมื่อบันทึกจะเก็บ URL และข้อมูลสื่อลง media สำหรับทดสอบ proxy โดยยังไม่ดาวน์โหลดหรืออัปโหลด การแสดงตัวอย่างอาจยังเปิดไม่ได้จนกว่าจะมีระบบ proxy",
   "quickImportSuccess": "นำเข้าและบันทึกวิดีโอเป็นฉบับร่างเรียบร้อยแล้ว",
   "importFailed": "ไม่สามารถนำเข้าข้อมูลได้",
+  "sitemapImport": {
+    "action": "นำเข้า Sitemap",
+    "eyebrow": "คิวนำเข้า",
+    "title": "นำเข้า Sitemap จาก MissAV",
+    "description": "บันทึก URL ภาษาอังกฤษจาก MissAV เข้าคิวโดยยังไม่เริ่มนำเข้าวิดีโอ ระบบจะข้าม slug ที่มีในเนื้อหาหรือคิวแล้วแบบชุดเดียว",
+    "back": "กลับหน้าวิดีโอ",
+    "url": "URL ของ Sitemap",
+    "urlHelp": "รองรับเฉพาะ Sitemap XML แบบ HTTPS ของ MissAV และจะแปลงโดเมนรายการทั้งหมดเป็น missav.ai",
+    "submit": "อ่านและเพิ่มเข้าคิว",
+    "importing": "กำลังอ่าน Sitemap...",
+    "failed": "ไม่สามารถนำเข้า Sitemap นี้ได้",
+    "queueTitle": "คิวรอนำเข้า",
+    "queueTotal": "ทั้งหมด {count} รายการ",
+    "queueEmpty": "ยังไม่มีรายการในคิวนำเข้า",
+    "dvdId": "DVD ID / slug",
+    "source": "แหล่งที่มา",
+    "statusLabel": "สถานะ",
+    "created": "วันที่เพิ่ม",
+    "status": {
+      "pending": "รอดำเนินการ",
+      "processing": "กำลังดำเนินการ",
+      "completed": "เสร็จสิ้น",
+      "failed": "ล้มเหลว"
+    },
+    "summary": {
+      "discovered": "URL ที่พบ",
+      "eligible": "URL /en/ ที่ใช้ได้",
+      "existingContents": "มีในเนื้อหาแล้ว",
+      "existingQueue": "มีในคิวแล้ว",
+      "skippedNonEnglish": "ข้ามภาษาอื่น",
+      "skippedEnglishSubtitle": "ข้าม English subtitle",
+      "skippedInvalid": "ข้าม URL ไม่ถูกต้อง",
+      "queued": "เพิ่มเข้าคิวใหม่"
+    }
+  },
   "editor": {
     "toolbar": "เครื่องมือจัดรูปแบบข้อความ",
     "editor": "ตัวแก้ไขเนื้อหาโพสต์",

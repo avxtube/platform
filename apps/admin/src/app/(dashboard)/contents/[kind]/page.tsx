@@ -1,4 +1,4 @@
-import { Plus, Search } from "lucide-react"
+import { ListPlus, Plus, Search } from "lucide-react"
 import { getTranslations } from "next-intl/server"
 import Link from "next/link"
 import { notFound } from "next/navigation"
@@ -59,10 +59,21 @@ export default async function ContentListPage({
             {t("manageDescription", { kind: kindLabel })}
           </p>
         </div>
-        <Link href={`/contents/${kind}/new`} className={buttonVariants()}>
-          <Plus className="size-4" />
-          {t("new", { kind: t(`kindSingular.${kind}`) })}
-        </Link>
+        <div className="flex flex-wrap gap-2">
+          {kind === "video" ? (
+            <Link
+              href="/contents/video/import"
+              className={buttonVariants({ variant: "outline" })}
+            >
+              <ListPlus className="size-4" />
+              {t("sitemapImport.action")}
+            </Link>
+          ) : null}
+          <Link href={`/contents/${kind}/new`} className={buttonVariants()}>
+            <Plus className="size-4" />
+            {t("new", { kind: t(`kindSingular.${kind}`) })}
+          </Link>
+        </div>
       </header>
 
       {kind === "video" ? <QuickContentImport /> : null}
