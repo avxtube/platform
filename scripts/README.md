@@ -93,7 +93,7 @@ openssl rand -base64 32
 
 ```bash
 read -rsp "GitHub token: " GITHUB_TOKEN && echo
-export GITHUB_TOKEN
+GITHUB_USER="ชื่อผู้ใช้_GitHub"
 ```
 
 ดาวน์โหลด installer จาก private repository และติดตั้ง Release ล่าสุด:
@@ -106,14 +106,16 @@ curl -fsSL \
   -H "Authorization: Bearer $GITHUB_TOKEN" \
   -H "X-GitHub-Api-Version: 2022-11-28" \
   "https://api.github.com/repos/avxtube/platform/contents/scripts/api-install.sh?ref=main" \
-  | sudo --preserve-env=GITHUB_TOKEN bash -s -- \
-      --env-file "$API_ENV_FILE"
+  | sudo bash -s -- \
+      --env-file "$API_ENV_FILE" \
+      --github-token "$GITHUB_TOKEN" \
+      --github-user "$GITHUB_USER"
 ```
 
 เมื่อติดตั้งเสร็จแล้ว ลบ token ออกจาก shell:
 
 ```bash
-unset GITHUB_TOKEN
+unset GITHUB_TOKEN GITHUB_USER
 ```
 
 ## ตรวจสอบสถานะ

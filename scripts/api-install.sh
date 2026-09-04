@@ -14,6 +14,8 @@ UNINSTALL=false
 DATABASE_URL=""
 ENV_FILE=""
 PORT="4000"
+GITHUB_USER="${GITHUB_USER:-}"
+GITHUB_TOKEN_VALUE="${GITHUB_TOKEN:-${GH_TOKEN:-}}"
 
 APP_NAME="avxtube-service"
 APP_DIR="/opt/$APP_NAME"
@@ -48,6 +50,8 @@ show_help() {
     echo "  --env-file FILE      Install a complete production environment file"
     echo "  --database-url URI   MongoDB connection string (DATABASE_URL)"
     echo "  --mongodb-uri URI    Alias for --database-url"
+    echo "  --github-user USER   GitHub username used to fetch the private release"
+    echo "  --github-token TOKEN Personal access token used only during installation"
     echo "  --port PORT          HTTP port (default: 4000)"
     echo "  -h, --help           Show this help"
 }
@@ -66,6 +70,16 @@ while [[ $# -gt 0 ]]; do
         --database-url|--mongodb-uri)
             require_option_value "$@"
             DATABASE_URL="$2"
+            shift 2
+            ;;
+        --github-user)
+            require_option_value "$@"
+            GITHUB_USER="$2"
+            shift 2
+            ;;
+        --github-token)
+            require_option_value "$@"
+            GITHUB_TOKEN_VALUE="$2"
             shift 2
             ;;
         --port)
@@ -104,11 +118,16 @@ if [ "$UNINSTALL" = true ]; then
     exit 0
 fi
 
-ACCESS_TOKEN="${GITHUB_TOKEN:-${GH_TOKEN:-}}"
+ACCESS_TOKEN="$GITHUB_TOKEN_VALUE"
 if [ -z "$ACCESS_TOKEN" ]; then
-    print_error "GITHUB_TOKEN or GH_TOKEN is required for this private repository"
+    print_error "GITHUB_TOKEN, GH_TOKEN, or --github-token is required for this private repository"
     print_error "Use a fine-grained token with Contents: Read access to $GITHUB_REPO"
     exit 1
+fi
+if [ -n "$GITHUB_USER" ]; then
+    print_status "Using GitHub authentication for: $GITHUB_USER"
+else
+    print_status "Using GitHub token authentication"
 fi
 
 if [ -n "$ENV_FILE" ] && [ ! -f "$ENV_FILE" ]; then
