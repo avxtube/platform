@@ -82,6 +82,7 @@ export function WatchPlayerProvider({
   React.useEffect(() => {
     const surface = document.createElement("aside")
     surface.dataset.watchPlayerSurface = ""
+    surface.style.display = "none"
     document.body.append(surface)
     playerSurfaceRef.current = surface
     setPlayerSurface(surface)
@@ -253,6 +254,19 @@ export function WatchPlayerProvider({
     (isWatchPage || showMiniPlayer)
   )
 
+  React.useLayoutEffect(() => {
+    if (!playerSurface || showPersistentPlayer) return
+    const surface = playerSurfaceRef.current
+    if (!surface) return
+    surface.style.display = "none"
+    surface.removeAttribute("aria-label")
+    if (
+      surface.isConnected &&
+      surface.parentElement !== document.body
+    )
+      document.body.append(surface)
+  }, [playerSurface, showPersistentPlayer])
+
   return (
     <WatchPlayerContext.Provider value={value}>
       {children}
@@ -333,6 +347,7 @@ function PersistentPlayer({
 
   React.useLayoutEffect(() => {
     if (!surface) return
+    surface.style.removeProperty("display")
     surface.setAttribute("aria-label", t("nowPlaying", { title: video.title }))
     surface.className = watchMode
       ? `absolute inset-0 z-10 overflow-hidden bg-black sm:rounded-xl ${visible ? "pointer-events-auto opacity-100" : "pointer-events-none opacity-0"}`
@@ -341,6 +356,11 @@ function PersistentPlayer({
     const destination = watchMode ? watchHost : document.body
     if (destination && surface.parentElement !== destination)
       destination.append(surface)
+
+    return () => {
+      surface.style.display = "none"
+      surface.removeAttribute("aria-label")
+    }
   }, [surface, t, video.title, visible, watchHost, watchMode])
 
   if (!surface) return null
