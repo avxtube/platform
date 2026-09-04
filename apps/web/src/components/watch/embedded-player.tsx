@@ -7,11 +7,11 @@ import * as React from "react"
 
 const playerStylesheet = publicNetworkUrl(
   process.env.NEXT_PUBLIC_PLAYER_STYLESHEET_URL,
-  "//localhost:8070/assets/player.bundle.min.css?v=embedded-player-32"
+  "https://media.avxtube.com/assets/v1.0.0/player.bundle.min.css"
 )
 const playerScript = publicNetworkUrl(
   process.env.NEXT_PUBLIC_PLAYER_SCRIPT_URL,
-  "//localhost:8070/assets/player.min.js?v=embedded-player-32"
+  "https://media.avxtube.com/assets/v1.0.0/player.min.js"
 )
 const jwPlayerScript = "//ssl.p.jwpcdn.com/player/v/8.49.10/jwplayer.js"
 
