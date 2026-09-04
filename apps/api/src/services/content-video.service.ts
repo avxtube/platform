@@ -26,7 +26,11 @@ function staticContentUrl(
 ) {
   // A missing setting must not send the browser directly to a hotlink-protected source.
   if (!domain || !contentSlug) return ""
-  return `https://${domain}/${encodeURIComponent(contentSlug)}/${file}`
+  return `//${domain}/${encodeURIComponent(contentSlug)}/${file}`
+}
+
+function protocolRelativeDomain(domain: string) {
+  return domain ? `//${domain}` : ""
 }
 
 export function publicVideoFilter(kind = "video"): Record<string, unknown> {
@@ -200,7 +204,10 @@ export function mapContentToVideo(
     content.kind === "video" && contentSlug && staticDomain && playlistDomain
       ? {
           vdoId: contentSlug,
-          node: { static: staticDomain, playlist: playlistDomain },
+          node: {
+            static: protocolRelativeDomain(staticDomain),
+            playlist: protocolRelativeDomain(playlistDomain),
+          },
         }
       : undefined
   return {

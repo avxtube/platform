@@ -13,6 +13,7 @@ import {
   type ImportedVideoData,
   type VideoImportResult,
 } from "@/components/content-import"
+import { withImportUrlCategories } from "@/lib/content-editor"
 
 type UploadedMedia = { url: string }
 type ResolvedItem = { key: string; id: string }
@@ -76,7 +77,11 @@ export function QuickContentImport() {
 
     const studios = importedNames(data.makers).slice(0, 1)
     const actors = importedNames(data.actresses)
-    const categories = importedNames(data.genres)
+    const categories = withImportUrlCategories(importedNames(data.genres), [
+      result.url,
+      data.sourceUrl,
+      sourcePageUrl,
+    ])
     const channels = [
       ...studios.map((name, index) => ({
         key: `studio:${index}`,
@@ -135,8 +140,8 @@ export function QuickContentImport() {
         title: nullable(data.title),
         slug: nullable(slug),
         description: nullable(data.content),
-        status: "draft",
-        visibility: "private",
+        status: "published",
+        visibility: "public",
         moderationStatus: "active",
         publishedAt: null,
         scheduledAt: null,

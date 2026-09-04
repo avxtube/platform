@@ -1,0 +1,30 @@
+import mongoose, { type InferSchemaType, type Model } from "mongoose";
+
+const { Schema, model, models } = mongoose;
+
+export const IMPORT_STATUSES = [
+  "pending",
+  "processing",
+  "completed",
+  "failed",
+] as const
+
+const queueImportSchema = new Schema(
+  {
+    _id: { type: String, required: true },
+    status: { type: String, enum: IMPORT_STATUSES, required: true, default: "pending" },
+    url: { type: String, required: true, unique: true },
+    dvdId: { type: String, unique: true },
+    workerId: { type: String },
+    startedAt: { type: Date },
+    failedAt: { type: Date },
+    completedAt: { type: Date },
+    error: { type: String },
+  },
+  { timestamps: true, versionKey: false, collection: "queue_imports" },
+);
+
+export type QueueImportSchemaType = InferSchemaType<typeof queueImportSchema>;
+
+export const QueueImportModel: Model<QueueImportSchemaType> =
+  (models?.QueueImport as Model<QueueImportSchemaType>) || model<QueueImportSchemaType>("QueueImport", queueImportSchema);

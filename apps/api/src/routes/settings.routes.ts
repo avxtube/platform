@@ -10,7 +10,7 @@ import {
 const router: Router = Router();
 
 // Only values needed before authentication belong here. Never expose credentials.
-const PUBLIC_SETTING_NAMES = new Set(["auth_setting"]);
+const PUBLIC_SETTING_NAMES = new Set(["auth_setting", "advert_hobby"]);
 
 function getPublicAuthSetting(value: unknown): typeof DEFAULT_AUTH_SETTING {
     const setting = value && typeof value === "object"

@@ -44,7 +44,8 @@ export function channelPositions(kind: string, metadata: unknown): string[] {
 }
 
 export async function resolveContentRelations(
-  value: unknown
+  value: unknown,
+  options: { staticDomain?: string } = {}
 ): Promise<ContentRelations> {
   const content = record(value)
   const metadata = record(content.metadata)
@@ -111,7 +112,20 @@ export async function resolveContentRelations(
       const item = mediaById.get(id)
       if (!item) return []
       const legacy = record(item)
-      const url = item.metadata?.directUrl ?? legacy.url ?? legacy.sourceUrl
+      const directUrl =
+        item.metadata?.directUrl ?? legacy.url ?? legacy.sourceUrl
+      const contentSlug =
+        typeof content.slug === "string" ? content.slug : ""
+      const staticFile =
+        item.purpose === "poster"
+          ? "poster.jpg"
+          : item.purpose === "trailer"
+            ? "preview.mp4"
+            : undefined
+      const url =
+        staticFile && options.staticDomain && contentSlug
+          ? `//${options.staticDomain}/${encodeURIComponent(contentSlug)}/${staticFile}`
+          : directUrl
       return [
         {
           id,
@@ -169,7 +183,8 @@ const slots = [
 // persist a URL or a named relation ID in Content.metadata.
 export async function prepareContentReferences(
   input: Record<string, unknown>,
-  actorId: string
+  actorId: string,
+  options: { staticDomain?: string } = {}
 ) {
   const metadata = { ...record(input.metadata) }
   if ("channelIds" in input || "studioId" in metadata || "actorIds" in metadata)
@@ -211,6 +226,16 @@ export async function prepareContentReferences(
     )
       continue
     const sourceUrl = url.trim()
+    if (
+      isStaticMediaUrl(
+        sourceUrl,
+        options.staticDomain,
+        input.slug,
+        slot.purpose
+      ) &&
+      selectedMedia.some((item) => item.purpose === slot.purpose)
+    )
+      continue
     if (
       selectedMedia.some(
         (item) =>
@@ -270,6 +295,26 @@ export async function prepareContentReferences(
   ])
     delete metadata[field]
   if ("metadata" in input) input.metadata = metadata
+}
+
+function isStaticMediaUrl(
+  value: string,
+  domain: string | undefined,
+  slug: unknown,
+  purpose: (typeof slots)[number]["purpose"]
+) {
+  const file =
+    purpose === "poster"
+      ? "poster.jpg"
+      : purpose === "trailer"
+        ? "preview.mp4"
+        : undefined
+  return (
+    Boolean(file) &&
+    Boolean(domain) &&
+    typeof slug === "string" &&
+    value === `//${domain}/${encodeURIComponent(slug)}/${file}`
+  )
 }
 
 async function assertReferences(

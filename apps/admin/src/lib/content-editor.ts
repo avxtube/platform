@@ -113,3 +113,29 @@ export function strings(value: unknown): string[] {
       ]
     : []
 }
+
+export function withImportUrlCategories(
+  categories: string[],
+  urls: unknown[]
+): string[] {
+  if (!urls.some(hasUncensoredLeakPath)) return categories
+  return [
+    "Uncensored leak",
+    ...categories.filter(
+      (name) => normalizeCategoryName(name) !== "uncensored-leak"
+    ),
+  ]
+}
+
+function hasUncensoredLeakPath(value: unknown) {
+  if (typeof value !== "string") return false
+  try {
+    return decodeURIComponent(value).toLowerCase().includes("uncensored-leak")
+  } catch {
+    return value.toLowerCase().includes("uncensored-leak")
+  }
+}
+
+function normalizeCategoryName(value: string) {
+  return value.trim().toLowerCase().replace(/[\s_]+/g, "-")
+}

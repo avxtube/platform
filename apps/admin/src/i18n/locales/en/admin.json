@@ -249,6 +249,10 @@
       "rolesHelp": "Enter domains only, without http:// or https://. Leave blank if not configured. Ports are allowed for local development.",
       "scraping": "Scraping service"
     },
+    "adverts": {
+      "title": "Advertisements",
+      "description": "Configure and reorder video, image and script advertisements."
+    },
     "fields": {
       "domain_content": {
         "label": "Content Domain",

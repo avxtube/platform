@@ -72,7 +72,11 @@ import {
 import { createPendingChannelValue } from "@/components/metadata/pending-channels"
 import { createPendingTermValue } from "@/components/metadata/pending-terms"
 import type { AdminContent, ContentKind } from "@/lib/content"
-import { contentEditorReferences, editorMetadata } from "@/lib/content-editor"
+import {
+  contentEditorReferences,
+  editorMetadata,
+  withImportUrlCategories,
+} from "@/lib/content-editor"
 
 const statuses = ["draft", "processing", "published", "failed"] as const
 const visibilities = ["public", "unlisted", "private"] as const
@@ -109,6 +113,7 @@ export function ContentForm({
   const [missavImport, setMissavImport] =
     React.useState<MissavMediaImport | null>(null)
   const pendingMediaRef = React.useRef(pendingMedia)
+  const remotePreviewTokensRef = React.useRef(new Set<string>())
   const committedMediaRef = React.useRef<Record<string, MediaUploadResult>>({})
   const uploadedMediaRef = React.useRef(new Map<string, string>())
   const [customMetadata, setCustomMetadata] = React.useState(() =>
@@ -201,6 +206,10 @@ export function ContentForm({
   async function applyImportedVideo(result: VideoImportResult) {
     const data = result.data
     const remoteImport = prepareMissavMediaImport(result)
+    if (!content) {
+      setStatus("published")
+      setVisibility("public")
+    }
     const importedSourceUrl = cleanImportedUrl(
       remoteImport?.sourcePageUrl ?? data.sourceUrl ?? result.url ?? ""
     )
@@ -230,13 +239,15 @@ export function ContentForm({
     }
 
     let preparedPoster: PendingMediaSelection | undefined
-    if (data.poster && !remoteImport) {
+    if (data.poster) {
       const poster = await preparePendingImageFromUrl({
         sourceUrl: cleanImportedUrl(data.poster),
         purpose: "poster",
-        referrerUrl: importedSourceUrl || undefined,
+        referrerUrl:
+          importedSourceUrl || (remoteImport ? "https://missav.ai/" : undefined),
       })
       preparedPoster = poster
+      if (remoteImport) remotePreviewTokensRef.current.add(poster.token)
       const previousToken = registeredMetadata.thumbnailUrl
       setPendingMedia((current) => {
         const next = { ...current }
@@ -250,11 +261,14 @@ export function ContentForm({
       })
     }
     let preparedTrailer: PendingMediaSelection | undefined
-    if (data.trailer && !remoteImport) {
+    if (data.trailer) {
       preparedTrailer = await preparePendingVideoFromUrl({
         sourceUrl: cleanImportedUrl(data.trailer),
-        referrerUrl: importedSourceUrl || undefined,
+        referrerUrl:
+          importedSourceUrl || (remoteImport ? "https://missav.ai/" : undefined),
       })
+      if (remoteImport)
+        remotePreviewTokensRef.current.add(preparedTrailer.token)
       const previousToken = registeredMetadata.trailerUrl
       setPendingMedia((current) => {
         const next = { ...current }
@@ -291,7 +305,11 @@ export function ContentForm({
 
     const actors = importedNames(data.actresses)
     const studios = importedNames(data.makers)
-    const categories = importedNames(data.genres)
+    const categories = withImportUrlCategories(importedNames(data.genres), [
+      result.url,
+      data.sourceUrl,
+      importedSourceUrl,
+    ])
     const labels = importedNames(data.labels)
     const directors = importedNames(data.directors)
     setRegisteredMetadata((current) => ({
@@ -380,13 +398,21 @@ export function ContentForm({
         if (id) references.mediaIds.push(id)
       }
       const finalPayload = { ...payload, ...references, metadata }
+      const requestPayload = content
+        ? changedContentPayload(finalPayload, content)
+        : finalPayload
+      if (content && !Object.keys(requestPayload).length) {
+        router.push(`/contents/${kind}`)
+        router.refresh()
+        return
+      }
       const url = content
         ? `/api/v1/admin/contents/${encodeURIComponent(content._id)}`
         : "/api/v1/admin/contents"
       const response = await fetch(url, {
         method: content ? "PATCH" : "POST",
         headers: { "content-type": "application/json" },
-        body: JSON.stringify(finalPayload),
+        body: JSON.stringify(requestPayload),
       })
       if (!response.ok) {
         const body = (await response.json().catch(() => null)) as {
@@ -406,6 +432,26 @@ export function ContentForm({
 
   async function commitMediaInMetadata(metadata: Record<string, unknown>) {
     let resolvedMetadata = metadata
+    const previewTokens = collectPendingMediaTokens(resolvedMetadata).filter(
+      (token) => remotePreviewTokensRef.current.has(token)
+    )
+    if (previewTokens.length) {
+      const remainingMedia = { ...pendingMediaRef.current }
+      for (const token of previewTokens) {
+        const selection = remainingMedia[token]
+        if (!selection?.sourceUrl) throw new Error(t("media.pendingMissing"))
+        resolvedMetadata = replacePendingMediaToken(
+          resolvedMetadata,
+          token,
+          selection.sourceUrl
+        ) as Record<string, unknown>
+        delete remainingMedia[token]
+        remotePreviewTokensRef.current.delete(token)
+        releasePendingPreview(selection)
+      }
+      pendingMediaRef.current = remainingMedia
+      setPendingMedia(remainingMedia)
+    }
     const trailerUrl = metadata.trailerUrl
     const existingTrailer = content?.relations?.media.some(
       (item) => item.position === "trailer" && item.url === trailerUrl
@@ -1008,6 +1054,67 @@ type ContentPayload = {
     metaDescription: string | null
     keywords: string[]
   }
+}
+
+type ContentSavePayload = ContentPayload & {
+  channelIds: string[]
+  termIds: string[]
+  mediaIds: string[]
+}
+
+function changedContentPayload(
+  next: ContentSavePayload,
+  content: AdminContent
+): Partial<ContentSavePayload> {
+  const metadata =
+    content.kind === "post" ? {} : editorMetadata(content)
+  const initial: ContentSavePayload = {
+    kind: content.kind,
+    title: nullableText(content.title ?? ""),
+    slug: nullableText(content.slug ?? ""),
+    description: nullableText(content.description ?? ""),
+    status: content.status,
+    visibility: content.visibility,
+    metadata,
+    seo: {
+      metaTitle: nullableText(content.seo?.metaTitle ?? ""),
+      metaDescription: nullableText(content.seo?.metaDescription ?? ""),
+      keywords: content.seo?.keywords ?? [],
+    },
+    ...contentEditorReferences(metadata, content),
+  }
+  return Object.fromEntries(
+    Object.entries(next).filter(
+      ([key, value]) =>
+        !samePayloadValue(value, initial[key as keyof ContentSavePayload])
+    )
+  ) as Partial<ContentSavePayload>
+}
+
+function samePayloadValue(left: unknown, right: unknown): boolean {
+  if (Object.is(left, right)) return true
+  if (Array.isArray(left) || Array.isArray(right)) {
+    return (
+      Array.isArray(left) &&
+      Array.isArray(right) &&
+      left.length === right.length &&
+      left.every((value, index) => samePayloadValue(value, right[index]))
+    )
+  }
+  if (isPlainRecord(left) || isPlainRecord(right)) {
+    if (!isPlainRecord(left) || !isPlainRecord(right)) return false
+    const leftKeys = Object.keys(left).sort()
+    const rightKeys = Object.keys(right).sort()
+    return (
+      samePayloadValue(leftKeys, rightKeys) &&
+      leftKeys.every((key) => samePayloadValue(left[key], right[key]))
+    )
+  }
+  return false
+}
+
+function isPlainRecord(value: unknown): value is Record<string, unknown> {
+  return Boolean(value) && typeof value === "object" && !Array.isArray(value)
 }
 
 function ConfirmationGroup({

@@ -90,26 +90,13 @@ function NavigationContent({ onNavigate }: { onNavigate?: () => void }) {
   const t = useTranslations("viewer.navigation")
   const auth = useTranslations("auth")
   const { data: session, isPending } = authClient.useSession()
-  const following = useFollowingProfiles()
   const visiblePrimaryItems = session?.user ? primaryItems.filter((item) => item.key !== "following") : primaryItems
   return (
     <>
       <nav className="space-y-0.5 border-b pb-3" aria-label={t("primaryLabel")}>
         {visiblePrimaryItems.map((item) => <NavigationLink key={item.href} item={item} onNavigate={onNavigate} />)}
       </nav>
-      {session?.user ? <nav className="space-y-1 border-b py-3" aria-label={t("followingLabel")}>
-        <Link href={viewerRoutes.following} onClick={onNavigate} className="flex items-center justify-between rounded-xl px-3 py-2 text-sm font-semibold hover:bg-muted"><span>{t("following")}</span><ChevronRight className="size-4" /></Link>
-        {following.items.map((profile) => (
-          <Link key={profile.id} href={viewerRoutes.followedProfile(profile.type, profile.handle)} onClick={onNavigate} title={t(profile.type)} className="flex items-center gap-3 rounded-xl px-3 py-2 text-sm hover:bg-muted">
-            <span className={`relative flex size-7 shrink-0 items-center justify-center overflow-hidden rounded-full bg-foreground text-[9px] font-bold text-background ${profile.isLive ? "ring-2 ring-red-500 ring-offset-2 ring-offset-background" : ""}`}>{profile.avatarUrl ? <Image src={profile.avatarUrl} alt="" fill unoptimized sizes="28px" className="object-cover" /> : profile.initials}</span>
-            <span className="truncate">{profile.name}</span>
-            {profile.isLive ? <Radio className="ml-auto size-4 shrink-0 text-red-500" aria-label={t("live")} /> : profile.hasNew ? <span className="ml-auto size-1.5 shrink-0 rounded-full bg-blue-600" aria-label={t("newContent")} /> : null}
-          </Link>
-        ))}
-        {following.hasMore ? <button type="button" disabled={following.loading} onClick={() => void following.loadMore()} className="flex w-full items-center gap-3 rounded-xl px-3 py-2 text-sm font-medium hover:bg-muted disabled:opacity-60">
-          {following.loading ? <LoaderCircle className="size-[18px] animate-spin" /> : <ChevronDown className="size-[18px]" />} {t(following.error ? "retry" : following.loading ? "loading" : "showMore")}
-        </button> : following.expanded ? <button type="button" onClick={following.collapse} className="flex w-full items-center gap-3 rounded-xl px-3 py-2 text-sm font-medium hover:bg-muted"><ChevronUp className="size-[18px]" />{t("showLess")}</button> : null}
-      </nav> : null}
+      {session?.user ? <FollowingNavigation onNavigate={onNavigate} /> : null}
       <nav className="space-y-0.5 border-b py-3" aria-label={t("libraryLabel")}>
         <p className="px-3 py-2 text-sm font-semibold">{t("you")}</p>
         {(session?.user ? libraryItems : libraryItems.slice(0, 2)).map((item) => <NavigationLink key={item.href} item={item} onNavigate={onNavigate} />)}
@@ -120,6 +107,24 @@ function NavigationContent({ onNavigate }: { onNavigate?: () => void }) {
       </footer>
     </>
   )
+}
+
+function FollowingNavigation({ onNavigate }: { onNavigate?: () => void }) {
+  const t = useTranslations("viewer.navigation")
+  const following = useFollowingProfiles()
+  return <nav className="space-y-1 border-b py-3" aria-label={t("followingLabel")}>
+    <Link href={viewerRoutes.following} onClick={onNavigate} className="flex items-center justify-between rounded-xl px-3 py-2 text-sm font-semibold hover:bg-muted"><span>{t("following")}</span><ChevronRight className="size-4" /></Link>
+    {following.items.map((profile) => (
+      <Link key={profile.id} href={viewerRoutes.followedProfile(profile.type, profile.handle)} onClick={onNavigate} title={t(profile.type)} className="flex items-center gap-3 rounded-xl px-3 py-2 text-sm hover:bg-muted">
+        <span className={`relative flex size-7 shrink-0 items-center justify-center overflow-hidden rounded-full bg-foreground text-[9px] font-bold text-background ${profile.isLive ? "ring-2 ring-red-500 ring-offset-2 ring-offset-background" : ""}`}>{profile.avatarUrl ? <Image src={profile.avatarUrl} alt="" fill unoptimized sizes="28px" className="object-cover" /> : profile.initials}</span>
+        <span className="truncate">{profile.name}</span>
+        {profile.isLive ? <Radio className="ml-auto size-4 shrink-0 text-red-500" aria-label={t("live")} /> : profile.hasNew ? <span className="ml-auto size-1.5 shrink-0 rounded-full bg-blue-600" aria-label={t("newContent")} /> : null}
+      </Link>
+    ))}
+    {following.hasMore ? <button type="button" disabled={following.loading} onClick={() => void following.loadMore()} className="flex w-full items-center gap-3 rounded-xl px-3 py-2 text-sm font-medium hover:bg-muted disabled:opacity-60">
+      {following.loading ? <LoaderCircle className="size-[18px] animate-spin" /> : <ChevronDown className="size-[18px]" />} {t(following.error ? "retry" : following.loading ? "loading" : "showMore")}
+    </button> : following.expanded ? <button type="button" onClick={following.collapse} className="flex w-full items-center gap-3 rounded-xl px-3 py-2 text-sm font-medium hover:bg-muted"><ChevronUp className="size-[18px]" />{t("showLess")}</button> : null}
+  </nav>
 }
 
 export function ViewerSidebar({ collapsed }: { collapsed: boolean }) {

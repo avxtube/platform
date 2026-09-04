@@ -16,6 +16,7 @@ import {
   prepareContentReferences,
   resolveContentRelations,
 } from "../services/content-relations.service"
+import { getDomainSettings } from "../services/settings/domain-setting.service"
 
 const router: Router = Router()
 
@@ -42,17 +43,61 @@ router.get("/", async (req: Request, res: Response, next: NextFunction) => {
       ]
     }
 
-    const [items, total] = await Promise.all([
+    const [items, total, domainSettings] = await Promise.all([
       ContentModel.find(filter)
         .sort({ updatedAt: -1, createdAt: -1 })
         .skip((page - 1) * limit)
         .limit(limit)
         .lean(),
       ContentModel.countDocuments(filter),
+      getDomainSettings(),
     ])
 
+    const mediaIds = [
+      ...new Set(
+        items.flatMap((item) =>
+          Array.isArray(item.mediaIds) ? item.mediaIds.map(String) : []
+        )
+      ),
+    ]
+    const media = mediaIds.length
+      ? await MediaModel.find({
+          _id: { $in: mediaIds },
+          kind: "image",
+          purpose: { $in: ["poster", "thumbnail"] },
+          deletedAt: null,
+        })
+          .select("_id purpose metadata.sprite")
+          .lean()
+      : []
+    const mediaById = new Map(media.map((item) => [String(item._id), item]))
+    const listItems = items.map((item) => {
+      const orderedMedia = (item.mediaIds ?? []).flatMap((id) => {
+        const value = mediaById.get(String(id))
+        return value ? [value] : []
+      })
+      const poster =
+        orderedMedia.find((value) => value.purpose === "poster") ??
+        orderedMedia.find(
+          (value) => value.purpose === "thumbnail" && !value.metadata?.sprite
+        )
+      const slug = typeof item.slug === "string" ? item.slug : ""
+      return {
+        ...item,
+        ...(poster && slug && domainSettings.domain_static
+          ? {
+              thumbnailUrl: staticContentUrl(
+                domainSettings.domain_static,
+                slug,
+                "poster.jpg"
+              ),
+            }
+          : {}),
+      }
+    })
+
     res.status(200).json({
-      items,
+      items: listItems,
       page,
       limit,
       total,
@@ -77,7 +122,10 @@ router.get(
         return
       }
 
-      const relations = await resolveContentRelations(content)
+      const { domain_static } = await getDomainSettings()
+      const relations = await resolveContentRelations(content, {
+        staticDomain: domain_static,
+      })
       res.status(200).json({ content, relations })
     } catch (error) {
       next(error)
@@ -89,7 +137,10 @@ router.post("/", async (req: Request, res: Response, next: NextFunction) => {
   try {
     const actor = getRequestActor(res)
     const input = parseContentInput(req.body, false)
-    await prepareContentReferences(input, actor.id)
+    const { domain_static } = await getDomainSettings()
+    await prepareContentReferences(input, actor.id, {
+      staticDomain: domain_static,
+    })
     const content = await ContentModel.create({
       ...input,
       createdBy: actor.id,
@@ -107,17 +158,28 @@ router.patch(
   async (req: Request<{ id: string }>, res: Response, next: NextFunction) => {
     try {
       const actor = getRequestActor(res)
-      if (
-        !(await ContentModel.exists({
+      const existingContent = await ContentModel.findOne({
           _id: req.params.id,
           deletedAt: { $exists: false },
-        }))
-      ) {
+        })
+        .select("channelIds termIds mediaIds")
+        .lean()
+      if (!existingContent) {
         res.status(404).json({ error: "Content not found" })
         return
       }
       const input = parseContentInput(req.body, true)
-      await prepareContentReferences(input, actor.id)
+      if ("metadata" in input) {
+        if (!("channelIds" in input))
+          input.channelIds = existingContent.channelIds ?? []
+        if (!("termIds" in input)) input.termIds = existingContent.termIds ?? []
+        if (!("mediaIds" in input))
+          input.mediaIds = existingContent.mediaIds ?? []
+      }
+      const { domain_static } = await getDomainSettings()
+      await prepareContentReferences(input, actor.id, {
+        staticDomain: domain_static,
+      })
       const content = await ContentModel.findOneAndUpdate(
         { _id: req.params.id, deletedAt: { $exists: false } },
         { $set: input },
@@ -289,6 +351,12 @@ function normalizeSlug(value: string) {
     .replace(/[^\p{L}\p{N}]+/gu, "-")
     .replace(/^-+|-+$/g, "")
     .slice(0, 300)
+}
+
+function staticContentUrl(domain: string, slug: string, file: string) {
+  return domain && slug
+    ? `//${domain}/${encodeURIComponent(slug)}/${file}`
+    : ""
 }
 
 function badRequest(message: string) {

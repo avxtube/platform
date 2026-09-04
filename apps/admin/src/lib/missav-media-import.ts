@@ -1,11 +1,14 @@
 import {
   createMissavMediaImport,
+  hasPlayableMissavPlaylist,
   isMissavPageUrl,
   isRecord,
   remoteMediaFields,
   remoteMediaIdFields,
   type MissavMediaImport,
 } from "@workspace/media"
+
+export { hasPlayableMissavPlaylist }
 
 export function prepareMissavMediaImport(result: unknown) {
   const bytes = new Uint8Array(16)

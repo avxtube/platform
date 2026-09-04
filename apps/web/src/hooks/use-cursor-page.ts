@@ -7,10 +7,12 @@ export function useCursorPage<Item extends { id: string }>({
   endpoint,
   initialItems,
   initialNextCursor,
+  pageSize = 4,
 }: {
   endpoint: string
   initialItems: Item[]
   initialNextCursor: string | null
+  pageSize?: number
 }) {
   const [items, setItems] = React.useState(initialItems)
   const [nextCursor, setNextCursor] = React.useState(initialNextCursor)
@@ -24,7 +26,7 @@ export function useCursorPage<Item extends { id: string }>({
     try {
       const url = new URL(endpoint, window.location.origin)
       url.searchParams.set("cursor", nextCursor)
-      url.searchParams.set("limit", "4")
+      url.searchParams.set("limit", String(pageSize))
       const response = await fetch(url, { headers: { accept: "application/json" } })
       if (!response.ok) throw new Error(`API returned ${response.status}`)
       const page = await response.json() as CursorPage<Item>
@@ -38,7 +40,7 @@ export function useCursorPage<Item extends { id: string }>({
     } finally {
       setLoading(false)
     }
-  }, [endpoint, loading, nextCursor])
+  }, [endpoint, loading, nextCursor, pageSize])
 
   const prepend = React.useCallback((item: Item) => {
     setItems((current) => [item, ...current.filter((currentItem) => currentItem.id !== item.id)])

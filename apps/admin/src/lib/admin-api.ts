@@ -9,13 +9,23 @@ import type {
   ContentRelations,
 } from "./content"
 import type { AdminStorage } from "./storage"
-import type { DomainSettings } from "@workspace/core/validators"
+import type {
+  AdvertSettings,
+  DomainSettings,
+} from "@workspace/core/validators"
 
 const apiUrl = process.env.API_INTERNAL_URL ?? "http://localhost:4000"
 
 export async function getDomainSettings(): Promise<DomainSettings> {
   const result = await fetchAdmin<{ settings: DomainSettings }>(
     new URL("/v1/admin/settings/domain", apiUrl)
+  )
+  return result.settings
+}
+
+export async function getAdvertSettings(): Promise<AdvertSettings> {
+  const result = await fetchAdmin<{ settings: AdvertSettings }>(
+    new URL("/v1/admin/settings/adverts", apiUrl)
   )
   return result.settings
 }

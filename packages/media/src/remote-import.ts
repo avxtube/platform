@@ -12,6 +12,19 @@ export type MissavMediaImport = {
   assets: RemoteMediaAsset[]
 }
 
+export function hasPlayableMissavPlaylist(
+  plan: MissavMediaImport | null | undefined
+) {
+  const video = plan?.assets.find((asset) => asset.purpose === "video")
+  const hls = video?.metadata.hls
+  return (
+    isRecord(hls) &&
+    Array.isArray(hls.variants) &&
+    hls.variants.length > 0 &&
+    hls.variants.every(isRecord)
+  )
+}
+
 export const remoteMediaFields: Record<RemoteMediaPurpose, string> = {
   poster: "thumbnailUrl",
   trailer: "trailerUrl",
@@ -50,6 +63,50 @@ export function isMissavPageUrl(value: unknown) {
   } catch {
     return false
   }
+}
+
+function isAllowedMissavRemoteUrl(value: string) {
+  try {
+    const url = new URL(value)
+    const allowed = ["missav.ai", "fourhoi.com", "surrit.com"].some(
+      (host) => url.hostname === host || url.hostname.endsWith(`.${host}`)
+    )
+    return (
+      allowed &&
+      ["https:", "http:"].includes(url.protocol) &&
+      !url.username &&
+      !url.password &&
+      !url.port &&
+      value.length <= 4_000
+    )
+  } catch {
+    return false
+  }
+}
+
+function normalizeSpriteMetadata(metadata: Record<string, unknown>) {
+  if (!isRecord(metadata.sprite)) return metadata
+  const sprite = { ...metadata.sprite }
+  if (sprite.sourceTemplate !== undefined) {
+    const sourceTemplate = cleanRemoteUrl(sprite.sourceTemplate)
+    if (
+      !isAllowedMissavRemoteUrl(sourceTemplate) ||
+      sourceTemplate.match(/\{index\}/g)?.length !== 1
+    )
+      throw new Error("Invalid remote sprite source template")
+    sprite.sourceTemplate = sourceTemplate
+  }
+  if (
+    sprite.firstIndex !== undefined &&
+    (!Number.isSafeInteger(sprite.firstIndex) || Number(sprite.firstIndex) < 0)
+  )
+    throw new Error("Invalid remote sprite first index")
+  if (
+    sprite.imageCount !== undefined &&
+    (!Number.isSafeInteger(sprite.imageCount) || Number(sprite.imageCount) < 1)
+  )
+    throw new Error("Invalid remote sprite image count")
+  return { ...metadata, sprite }
 }
 
 // The scraper's thumbnail is a sprite descriptor, not the poster image.
@@ -119,22 +176,13 @@ export function parseMissavMediaImport(value: unknown): MissavMediaImport {
     if (purposes.has(purpose)) throw new Error("Duplicate remote media purpose")
     purposes.add(purpose)
     const sourceUrl = cleanRemoteUrl(asset.sourceUrl)
-    if (sourceUrl) {
-      const url = new URL(sourceUrl)
-      const allowed = ["missav.ai", "fourhoi.com", "surrit.com"].some(
-        (host) => url.hostname === host || url.hostname.endsWith(`.${host}`)
-      )
-      if (
-        !allowed ||
-        !["https:", "http:"].includes(url.protocol) ||
-        url.username ||
-        url.password ||
-        url.port ||
-        sourceUrl.length > 4_000
-      )
-        throw new Error("Remote media URL is not an allowed MissAV origin")
-    }
-    const metadata = isRecord(asset.metadata) ? asset.metadata : {}
+    if (sourceUrl && !isAllowedMissavRemoteUrl(sourceUrl))
+      throw new Error("Remote media URL is not an allowed MissAV origin")
+    const rawMetadata = isRecord(asset.metadata) ? asset.metadata : {}
+    const metadata =
+      purpose === "thumbnail"
+        ? normalizeSpriteMetadata(rawMetadata)
+        : rawMetadata
     if (
       !sourceUrl &&
       !(purpose === "thumbnail" && isRecord(metadata.sprite)) &&

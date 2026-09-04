@@ -230,7 +230,10 @@ function Poster({ content }: { content: AdminContent }) {
 }
 
 function mediaUrl(content: AdminContent) {
-  const value = content.metadata?.thumbnailUrl ?? content.metadata?.posterUrl
+  const value =
+    content.thumbnailUrl ??
+    content.metadata?.thumbnailUrl ??
+    content.metadata?.posterUrl
   return typeof value === "string" ? value : ""
 }
 

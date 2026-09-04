@@ -49,6 +49,7 @@ export * from "./scroll-area";
 export * from "./native-select";
 export * from "./select";
 export * from "./separator";
+export * from "./setting-card";
 export * from "./sheet";
 export * from "./sidebar";
 export * from "./skeleton";

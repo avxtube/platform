@@ -1,5 +1,8 @@
 import { Router } from "express"
-import { domainSettingSchema } from "@workspace/core/validators"
+import {
+  advertHobbyValid,
+  domainSettingSchema,
+} from "@workspace/core/validators"
 import {
   authenticateUser,
   requireAdmin,
@@ -8,6 +11,10 @@ import {
   getDomainSettings,
   saveDomainSettings,
 } from "../services/settings/domain-setting.service"
+import {
+  getAdvertSettings,
+  saveAdvertSettings,
+} from "../services/settings/advert-setting.service"
 
 const router: Router = Router()
 router.use(authenticateUser, requireAdmin)
@@ -40,6 +47,30 @@ router.put("/domain", async (req, res, next) => {
   }
   try {
     res.json({ settings: await saveDomainSettings(parsed.data) })
+  } catch (error) {
+    next(error)
+  }
+})
+
+router.get("/adverts", async (_req, res, next) => {
+  try {
+    res.json({ settings: await getAdvertSettings() })
+  } catch (error) {
+    next(error)
+  }
+})
+
+router.put("/adverts", async (req, res, next) => {
+  const parsed = advertHobbyValid.safeParse(req.body)
+  if (!parsed.success) {
+    res.status(400).json({
+      error: "Invalid advert settings",
+      issues: parsed.error.issues,
+    })
+    return
+  }
+  try {
+    res.json({ settings: await saveAdvertSettings(parsed.data) })
   } catch (error) {
     next(error)
   }

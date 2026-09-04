@@ -3,6 +3,7 @@ import { afterEach, mock, test } from "node:test"
 import { MediaModel } from "@workspace/db/models"
 import {
   createMissavMediaImport,
+  hasPlayableMissavPlaylist,
   isMissavPageUrl,
   parseMissavMediaImport,
   type MissavMediaImport,
@@ -17,7 +18,16 @@ const sourcePageUrl = "https://missav.ai/dm26/th/example-001"
 const sourceUrl = "https://surrit.com/example/playlist.m3u8"
 const poster = "https://fourhoi.com/example/cover-n.jpg"
 const trailer = "https://fourhoi.com/example/preview.mp4"
-const sprite = { col: 6, row: 6, width: 300, height: 168, secondsPerImage: 2 }
+const sprite = {
+  col: 6,
+  row: 6,
+  width: 300,
+  height: 168,
+  secondsPerImage: 2,
+  sourceTemplate: "https://surrit.com/example/seek/_{index}.jpg",
+  firstIndex: 0,
+  imageCount: 73,
+}
 const video = {
   kind: "hls-blob-master",
   schemaVersion: 1,
@@ -52,6 +62,7 @@ afterEach(() => mock.restoreAll())
 
 test("MissAV creates four assets and retains the HLS and sprite descriptors", () => {
   const plan = makePlan()
+  assert.equal(hasPlayableMissavPlaylist(plan), true)
   assert.equal(plan.assets.length, 4)
   assert.deepEqual(
     plan.assets.find((asset) => asset.purpose === "video")?.metadata.hls,
@@ -98,6 +109,7 @@ test("older scraper output without video or thumbnail remains supported", () => 
     plan?.assets.find((asset) => asset.purpose === "video")?.sourceUrl,
     sourceUrl
   )
+  assert.equal(hasPlayableMissavPlaylist(plan), false)
 })
 
 test("descriptor-only media is kept pending rather than dropped", () => {
@@ -113,6 +125,7 @@ test("descriptor-only media is kept pending rather than dropped", () => {
   )
   assert.equal(plan?.assets.length, 2)
   assert.ok(plan?.assets.every((asset) => !asset.sourceUrl))
+  assert.equal(hasPlayableMissavPlaylist(plan), false)
 })
 
 test("rejects duplicate purposes, foreign origins, and oversized descriptors", () => {
@@ -146,6 +159,25 @@ test("rejects duplicate purposes, foreign origins, and oversized descriptors", (
       }),
     /too large/
   )
+  for (const sourceTemplate of [
+    "https://evil.test/seek/_{index}.jpg",
+    "https://surrit.com/example/seek/image.jpg",
+    "https://surrit.com/example/seek/_{index}_{index}.jpg",
+  ]) {
+    assert.throws(
+      () =>
+        parseMissavMediaImport({
+          ...plan,
+          assets: [
+            {
+              purpose: "thumbnail",
+              metadata: { sprite: { ...sprite, sourceTemplate } },
+            },
+          ],
+        }),
+      /sprite source template/
+    )
+  }
 })
 
 test("registration never fetches assets and writes remote metadata with stable IDs", async () => {

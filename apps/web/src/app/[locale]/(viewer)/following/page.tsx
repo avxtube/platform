@@ -2,6 +2,7 @@ import type { Locale } from "@workspace/i18n/config"
 import { getFollowingFeed, getFollowingProfiles } from "@workspace/services/queries/video"
 import { UsersRound } from "lucide-react"
 import { getTranslations } from "next-intl/server"
+import { headers } from "next/headers"
 import { getCurrentUser } from "@workspace/auth/server"
 import { FollowingProfileCarousel } from "@/components/following/following-profile-carousel"
 import { FollowingVideoFeed } from "@/components/following/following-video-feed"
@@ -13,8 +14,10 @@ export default async function FollowingPage({ params }: { params: Promise<{ loca
   const { locale } = await params
   const user = await getCurrentUser()
   if (!user.userId) return <ViewerSignInPrompt kind="following" locale={locale} />
+  const requestHeaders = await headers()
+  const cookie = requestHeaders.get("cookie")
   const [profiles, feed, t] = await Promise.all([
-    getFollowingProfiles(0, 10).catch(() => ({ items: [], nextCursor: null, total: 0 })),
+    getFollowingProfiles(0, 10, cookie ? { cookie } : undefined).catch(() => ({ items: [], nextCursor: null, total: 0 })),
     getFollowingFeed(0, 8).catch(() => ({ items: [], nextCursor: null, total: 0 })),
     getTranslations({ locale, namespace: "video.following" }),
   ])

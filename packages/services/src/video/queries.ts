@@ -28,9 +28,11 @@ function createVideosApiUrl(path = ""): URL {
   return new URL(`/${apiVersion}/videos${path}`, apiOrigin);
 }
 
-async function fetchJson<ResponseBody>(url: URL): Promise<ResponseBody> {
+async function fetchJson<ResponseBody>(url: URL, requestHeaders?: HeadersInit): Promise<ResponseBody> {
+  const headers = new Headers(requestHeaders);
+  headers.set("accept", "application/json");
   const response = await fetch(url, {
-    headers: { accept: "application/json" },
+    headers,
     cache: "no-store",
   });
 
@@ -132,11 +134,11 @@ export async function getStudioOverview(): Promise<StudioOverview> {
   return response.overview;
 }
 
-export async function getFollowingProfiles(cursor = 0, limit = 10): Promise<CursorPage<FollowingProfile>> {
+export async function getFollowingProfiles(cursor = 0, limit = 10, requestHeaders?: HeadersInit): Promise<CursorPage<FollowingProfile>> {
   const url = new URL(`/${apiVersion}/following`, apiOrigin);
   url.searchParams.set("cursor", String(cursor));
   url.searchParams.set("limit", String(limit));
-  return fetchJson<CursorPage<FollowingProfile>>(url);
+  return fetchJson<CursorPage<FollowingProfile>>(url, requestHeaders);
 }
 
 export async function getFollowingFeed(cursor = 0, limit = 8): Promise<CursorPage<Video>> {

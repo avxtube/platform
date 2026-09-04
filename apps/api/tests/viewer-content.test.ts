@@ -142,18 +142,12 @@ test("maps poster, trailer and highest video rendition from media only", () => {
     "static.example",
     "playlist.example"
   )
-  assert.equal(
-    video.thumbnailUrl,
-    "https://static.example/example-video/poster.jpg"
-  )
-  assert.equal(
-    video.previewUrl,
-    "https://static.example/example-video/preview.mp4"
-  )
+  assert.equal(video.thumbnailUrl, "//static.example/example-video/poster.jpg")
+  assert.equal(video.previewUrl, "//static.example/example-video/preview.mp4")
   assert.equal(video.playbackUrl, undefined)
   assert.deepEqual(video.player, {
     vdoId: "example-video",
-    node: { static: "static.example", playlist: "playlist.example" },
+    node: { static: "//static.example", playlist: "//playlist.example" },
   })
   assert.equal(video.durationSeconds, 123.25)
   assert.equal(video.category, "B")
@@ -278,15 +272,15 @@ test("video endpoint returns accurate pagination without N+1 relation queries", 
     assert.equal(result.items[0].channel.id, "studio")
     assert.equal(
       result.items[0].thumbnailUrl,
-      "https://static.example/example-video/poster.jpg"
+      "//static.example/example-video/poster.jpg"
     )
     assert.equal(
       result.items[0].previewUrl,
-      "https://static.example/example-video/preview.mp4"
+      "//static.example/example-video/preview.mp4"
     )
     assert.deepEqual(result.items[0].player, {
       vdoId: "example-video",
-      node: { static: "static.example", playlist: "playlist.example" },
+      node: { static: "//static.example", playlist: "//playlist.example" },
     })
     assert.equal(settings.mock.callCount(), 1)
     assert.equal(aggregate.mock.callCount(), 1)
@@ -321,17 +315,14 @@ test("static paths use content slugs, even for stored files or descriptor-only m
   const video = mapContentToVideo(content, "static.example:8443")
   assert.equal(
     video.thumbnailUrl,
-    "https://static.example:8443/different-slug/poster.jpg"
+    "//static.example:8443/different-slug/poster.jpg"
   )
   assert.equal(
     video.previewUrl,
-    "https://static.example:8443/different-slug/preview.mp4"
+    "//static.example:8443/different-slug/preview.mp4"
   )
   const short = mapContentToShort(content, "static.example")
-  assert.equal(
-    short.thumbnailUrl,
-    "https://static.example/different-slug/poster.jpg"
-  )
+  assert.equal(short.thumbnailUrl, "//static.example/different-slug/poster.jpg")
   assert.equal(
     content.media[0]?.metadata.directUrl,
     "https://bucket.example/source.webp"
@@ -386,11 +377,11 @@ test("every response uses a fresh database static domain shared across all mappe
   const second = await getContentMappers()
   assert.equal(
     second.mapVideo(fixture()).previewUrl,
-    "https://changed.example/example-video/preview.mp4"
+    "//changed.example/example-video/preview.mp4"
   )
   assert.equal(
     first.mapVideo(fixture()).previewUrl,
-    "https://static.example/example-video/preview.mp4"
+    "//static.example/example-video/preview.mp4"
   )
   assert.equal(settings.mock.callCount(), 2)
 })
@@ -408,6 +399,6 @@ test("missing slugs do not fall back to IDs and slug path segments are encoded",
   )
   assert.equal(
     encoded.thumbnailUrl,
-    "https://static.example/example%2Fvideo%20name/poster.jpg"
+    "//static.example/example%2Fvideo%20name/poster.jpg"
   )
 })

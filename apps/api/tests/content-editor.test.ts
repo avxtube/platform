@@ -9,6 +9,7 @@ import {
 import {
   contentEditorReferences,
   editorMetadata,
+  withImportUrlCategories,
 } from "../../admin/src/lib/content-editor"
 import type { AdminContent } from "../../admin/src/lib/content"
 
@@ -168,6 +169,20 @@ test("role resolution supports new and existing channels without modifying IDs",
   assert.deepEqual(channelPositions("actor", {}), ["actors"])
 })
 
+test("uncensored-leak imports prepend the category without duplicates", () => {
+  assert.deepEqual(
+    withImportUrlCategories(
+      ["Drama", "Uncensored Leak", "Featured"],
+      ["https://missav.ai/en/example-uncensored-leak"]
+    ),
+    ["Uncensored leak", "Drama", "Featured"]
+  )
+  assert.deepEqual(
+    withImportUrlCategories(["Drama"], ["https://missav.ai/en/example"]),
+    ["Drama"]
+  )
+})
+
 test("detail response batches relations and restores content ID order", async () => {
   const channels = mock.method(ChannelModel, "find", () => ({
     lean: async () => [
@@ -212,6 +227,13 @@ test("detail response batches relations and restores content ID order", async ()
         provider: "s3",
         metadata: { directUrl: "https://cdn.test/poster.webp" },
       },
+      {
+        _id: "trailer",
+        kind: "video",
+        purpose: "trailer",
+        provider: "remote",
+        metadata: { directUrl: "https://cdn.test/trailer.mp4" },
+      },
     ],
   }))
   const result = await resolveContentRelations(content)
@@ -224,11 +246,29 @@ test("detail response batches relations and restores content ID order", async ()
     result.media.map((item) => [item.id, item.position, item.quality]),
     [
       ["poster", "poster", undefined],
+      ["trailer", "trailer", undefined],
       ["v360", "video", "360"],
     ]
   )
+  assert.equal(
+    result.media.find((item) => item.position === "poster")?.url,
+    "https://cdn.test/poster.webp"
+  )
+
+  const staticResult = await resolveContentRelations(
+    { ...content, slug: "video slug" },
+    { staticDomain: "static.avxtube.org" }
+  )
+  assert.equal(
+    staticResult.media.find((item) => item.position === "poster")?.url,
+    "//static.avxtube.org/video%20slug/poster.jpg"
+  )
+  assert.equal(
+    staticResult.media.find((item) => item.position === "trailer")?.url,
+    "//static.avxtube.org/video%20slug/preview.mp4"
+  )
   for (const query of [channels, terms, media])
-    assert.equal(query.mock.callCount(), 1)
+    assert.equal(query.mock.callCount(), 2)
 })
 
 function existingReferences() {
@@ -284,6 +324,58 @@ test("uploaded local relative URLs resolve to existing IDs, not new remote recor
   const input = { metadata: { thumbnailUrl: url } }
   await prepareContentReferences(input, "admin")
   assert.deepEqual(input, { metadata: {}, mediaIds: ["uploaded"] })
+})
+
+test("saving unchanged static media URLs retains their existing media IDs", async () => {
+  for (const model of [ChannelModel, TermModel, MediaModel]) {
+    mock.method(
+      model,
+      "countDocuments",
+      async (filter: { _id: { $in: string[] } }) => filter._id.$in.length
+    )
+  }
+  mock.method(MediaModel, "find", () => ({
+    lean: async () => [
+      {
+        _id: "poster",
+        kind: "image",
+        purpose: "poster",
+        provider: "remote",
+        metadata: { directUrl: "https://origin.test/poster.jpg" },
+      },
+      {
+        _id: "trailer",
+        kind: "video",
+        purpose: "trailer",
+        provider: "remote",
+        metadata: { directUrl: "https://origin.test/preview.mp4" },
+      },
+    ],
+  }))
+  const find = mock.method(MediaModel, "findOne", () => {
+    throw new Error("Unexpected lookup")
+  })
+  const write = mock.method(MediaModel, "updateOne", () => {
+    throw new Error("Unexpected write")
+  })
+  const input = {
+    slug: "video-slug",
+    mediaIds: ["poster", "trailer"],
+    metadata: {
+      thumbnailUrl: "//static.avxtube.org/video-slug/poster.jpg",
+      trailerUrl: "//static.avxtube.org/video-slug/preview.mp4",
+    },
+  }
+  await prepareContentReferences(input, "admin", {
+    staticDomain: "static.avxtube.org",
+  })
+  assert.deepEqual(input, {
+    slug: "video-slug",
+    mediaIds: ["poster", "trailer"],
+    metadata: {},
+  })
+  assert.equal(find.mock.callCount(), 0)
+  assert.equal(write.mock.callCount(), 0)
 })
 
 test("manual remote URL creates a media record and is stripped from Content", async () => {

@@ -17,7 +17,9 @@ its hostname. Other sources keep their existing preparation/upload flow.
 descriptors as `provider: remote` records. Source URLs and referrer information
 are stored in media metadata, not on Content.
 It does not download, upload, or contact VdoHide. The form registers on save;
-quick import registers before resolving relations and saving its draft.
+quick import registers before resolving relations. New-form and quick imports
+publish as `published/public` only when the MissAV HLS descriptor contains at
+least one playlist variant. Legacy URL-only or empty descriptors remain drafts.
 
 Contents store `mediaIds`; the API resolves each record's `purpose` and `quality`.
 For parsed HLS renditions, each Media stores its root `quality` (`360`, `480`,

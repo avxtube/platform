@@ -1,6 +1,7 @@
 import type { Metadata } from "next"
 import { NextIntlClientProvider } from "next-intl"
 import { getLocale, getMessages } from "next-intl/server"
+import { Toaster } from "sonner"
 
 import "@workspace/ui/styles/globals.css"
 
@@ -21,7 +22,10 @@ export default async function RootLayout({ children }: { children: React.ReactNo
     <html lang={locale} suppressHydrationWarning>
       <body className="min-h-svh bg-background font-sans text-foreground antialiased">
         <NextIntlClientProvider locale={locale} messages={messages}>
-          <ThemeProvider>{children}</ThemeProvider>
+          <ThemeProvider>
+            {children}
+            <Toaster richColors />
+          </ThemeProvider>
         </NextIntlClientProvider>
       </body>
     </html>

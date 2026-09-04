@@ -1,12 +1,13 @@
-/* eslint-disable @next/next/no-img-element */
 "use client"
 
 import * as React from "react"
 import type { Video } from "@workspace/core/types"
-import { Maximize2, Pause, Play, Volume2, VolumeX, X } from "lucide-react"
+import type { AdvertSettings } from "@workspace/core/validators"
 import { useTranslations } from "next-intl"
+import { createPortal, flushSync } from "react-dom"
 
 import { usePathname, useRouter } from "@/i18n/navigation"
+import { EmbeddedPlayer, type PlayerPlaybackState } from "./embedded-player"
 
 type PlayerState = {
   video: Video | null
@@ -18,6 +19,8 @@ type PlayerState = {
   speed: number
   started: boolean
 }
+
+type PlayerSurface = "watch" | "mini"
 
 type WatchPlayerContextValue = PlayerState & {
   activate: (
@@ -31,6 +34,8 @@ type WatchPlayerContextValue = PlayerState & {
   setVolume: (volume: number) => void
   toggleMuted: () => void
   togglePlaying: () => void
+  syncPlayback: (state: PlayerPlaybackState, surface: PlayerSurface) => void
+  registerWatchHost: (node: HTMLDivElement | null) => void
 }
 
 const initialState: PlayerState = {
@@ -56,39 +61,49 @@ export function useWatchPlayer() {
 
 export function WatchPlayerProvider({
   children,
+  adverts,
 }: {
   children: React.ReactNode
+  adverts: AdvertSettings
 }) {
   const pathname = usePathname()
   const router = useRouter()
   const [state, setState] = React.useState(initialState)
+  const [watchHost, setWatchHost] = React.useState<HTMLDivElement | null>(null)
+  const [miniRequested, setMiniRequested] = React.useState(false)
+  const [playerSurface, setPlayerSurface] = React.useState<HTMLElement | null>(
+    null
+  )
+  const playerSurfaceRef = React.useRef<HTMLElement | null>(null)
+  const activeSurface = React.useRef<PlayerSurface>("watch")
+  activeSurface.current =
+    pathname.startsWith("/watch") && !miniRequested ? "watch" : "mini"
 
   React.useEffect(() => {
-    if (!state.isPlaying || !state.video) return
-    const timer = window.setInterval(
-      () =>
-        setState((current) => {
-          if (!current.video || !current.isPlaying) return current
-          const nextTime = Math.min(
-            current.video.durationSeconds,
-            current.currentTime + current.speed
-          )
-          return {
-            ...current,
-            currentTime: nextTime,
-            isPlaying: nextTime < current.video.durationSeconds,
-          }
-        }),
-      1000
-    )
-    return () => window.clearInterval(timer)
-  }, [state.isPlaying, state.video])
+    const surface = document.createElement("aside")
+    surface.dataset.watchPlayerSurface = ""
+    document.body.append(surface)
+    playerSurfaceRef.current = surface
+    setPlayerSurface(surface)
+
+    return () => {
+      if (playerSurfaceRef.current === surface) playerSurfaceRef.current = null
+      surface.remove()
+    }
+  }, [])
 
   const activate = React.useCallback(
     (video: Video, playlist: { id: string; index: number } | null = null) =>
       setState((current) => {
         if (current.video?.id !== video.id)
-          return { ...initialState, video, playlist }
+          return {
+            ...initialState,
+            video,
+            playlist,
+            muted: current.muted,
+            volume: current.volume,
+            speed: current.speed,
+          }
         if (
           current.playlist?.id === playlist?.id &&
           current.playlist?.index === playlist?.index
@@ -131,9 +146,69 @@ export function WatchPlayerProvider({
     (speed: number) => setState((current) => ({ ...current, speed })),
     []
   )
-  const dismiss = React.useCallback(() => setState(initialState), [])
+  const syncPlayback = React.useCallback(
+    (patch: PlayerPlaybackState, surface: PlayerSurface) => {
+      if (surface !== activeSurface.current) return
+      setState((current) =>
+        current.video
+          ? {
+              ...current,
+              ...(typeof patch.currentTime === "number"
+                ? { currentTime: patch.currentTime }
+                : {}),
+              ...(typeof patch.isPlaying === "boolean"
+                ? { isPlaying: patch.isPlaying }
+                : {}),
+              ...(typeof patch.muted === "boolean"
+                ? { muted: patch.muted }
+                : {}),
+              ...(typeof patch.volume === "number"
+                ? { volume: patch.volume }
+                : {}),
+              ...(typeof patch.speed === "number"
+                ? { speed: patch.speed }
+                : {}),
+              ...(typeof patch.started === "boolean"
+                ? { started: current.started || patch.started }
+                : {}),
+            }
+          : current
+      )
+    },
+    []
+  )
+  const dismiss = React.useCallback(() => {
+    setState((current) => ({
+      ...initialState,
+      muted: current.muted,
+      volume: current.volume,
+      speed: current.speed,
+    }))
+    setMiniRequested(false)
+  }, [])
+  const registerWatchHost = React.useCallback((node: HTMLDivElement | null) => {
+    if (!node) {
+      const surface = playerSurfaceRef.current
+      // Keep the persistent player alive when React removes the watch page.
+      // Moving it first prevents the media element from being detached with
+      // its host during a route transition.
+      if (surface?.isConnected && surface.parentElement !== document.body)
+        document.body.append(surface)
+    }
+    setWatchHost(node)
+    if (node) setMiniRequested(false)
+  }, [])
   const openMiniPlayer = React.useCallback(() => {
-    setState((current) => ({ ...current, started: true }))
+    // Commit the playback snapshot before navigation swaps the watch surface
+    // for the miniplayer surface. Without this, a fast route transition can
+    // render the destination from the previous (not-started) snapshot.
+    flushSync(() => {
+      setState((current) => ({ ...current, started: true }))
+      setMiniRequested(true)
+    })
+    const surface = playerSurfaceRef.current
+    if (surface?.isConnected && surface.parentElement !== document.body)
+      document.body.append(surface)
     router.push("/")
   }, [router])
   const value = React.useMemo(
@@ -142,9 +217,11 @@ export function WatchPlayerProvider({
       activate,
       dismiss,
       openMiniPlayer,
+      registerWatchHost,
       seek,
       setSpeed,
       setVolume,
+      syncPlayback,
       toggleMuted,
       togglePlaying,
     }),
@@ -152,9 +229,11 @@ export function WatchPlayerProvider({
       activate,
       dismiss,
       openMiniPlayer,
+      registerWatchHost,
       seek,
       setSpeed,
       setVolume,
+      syncPlayback,
       state,
       toggleMuted,
       togglePlaying,
@@ -166,101 +245,137 @@ export function WatchPlayerProvider({
     !pathname.startsWith("/watch") &&
     !pathname.startsWith("/shorts")
   )
+  const isWatchPage = pathname.startsWith("/watch")
+  const useWatchSurface = Boolean(isWatchPage && watchHost && !miniRequested)
+  const showPersistentPlayer = Boolean(
+    state.video &&
+    !pathname.startsWith("/shorts") &&
+    (isWatchPage || showMiniPlayer)
+  )
 
   return (
     <WatchPlayerContext.Provider value={value}>
       {children}
-      {showMiniPlayer && state.video ? (
-        <MiniPlayer video={state.video} state={value} />
+      {showPersistentPlayer && state.video ? (
+        <PersistentPlayer
+          adverts={adverts}
+          video={state.video}
+          state={value}
+          surface={playerSurface}
+          watchHost={watchHost}
+          watchMode={useWatchSurface}
+          visible={
+            useWatchSurface ||
+            Boolean(
+              state.started && (miniRequested || !isWatchPage || !watchHost)
+            )
+          }
+        />
       ) : null}
     </WatchPlayerContext.Provider>
   )
 }
 
-function MiniPlayer({
+function PersistentPlayer({
+  adverts,
   video,
   state,
+  surface,
+  watchHost,
+  watchMode,
+  visible,
 }: {
+  adverts: AdvertSettings
   video: Video
   state: WatchPlayerContextValue
+  surface: HTMLElement | null
+  watchHost: HTMLDivElement | null
+  watchMode: boolean
+  visible: boolean
 }) {
   const t = useTranslations("video")
   const router = useRouter()
-  const progress =
-    video.durationSeconds > 0
-      ? (state.currentTime / video.durationSeconds) * 100
-      : 0
+  const syncPlayback = state.syncPlayback
+  const syncCurrentPlayback = React.useCallback(
+    (patch: PlayerPlaybackState) =>
+      syncPlayback(patch, watchMode ? "watch" : "mini"),
+    [syncPlayback, watchMode]
+  )
   const watchHref = state.playlist
     ? `/watch/${video.id}?list=${encodeURIComponent(state.playlist.id)}&index=${state.playlist.index}`
     : `/watch/${video.id}`
-  return (
-    <aside
-      aria-label={t("nowPlaying", { title: video.title })}
-      className="fixed right-3 bottom-[calc(4.75rem+env(safe-area-inset-bottom))] z-[70] w-[calc(100vw-24px)] max-w-[390px] overflow-hidden rounded-xl border bg-background shadow-2xl lg:right-5 lg:bottom-5"
-    >
+  const dismiss = state.dismiss
+  const handleMiniPlayerAction = React.useCallback(
+    (action: "restore" | "close") => {
+      if (action === "restore") router.push(watchHref)
+      else dismiss()
+    },
+    [dismiss, router, watchHref]
+  )
+  const playerPlaybackState = React.useMemo<PlayerPlaybackState>(
+    () => ({
+      currentTime: state.currentTime,
+      isPlaying: state.isPlaying,
+      muted: state.muted,
+      volume: state.volume,
+      speed: state.speed,
+      started: state.started,
+    }),
+    [
+      state.currentTime,
+      state.isPlaying,
+      state.muted,
+      state.speed,
+      state.started,
+      state.volume,
+    ]
+  )
+
+  React.useLayoutEffect(() => {
+    if (!surface) return
+    surface.setAttribute("aria-label", t("nowPlaying", { title: video.title }))
+    surface.className = watchMode
+      ? `absolute inset-0 z-10 overflow-hidden bg-black sm:rounded-xl ${visible ? "pointer-events-auto opacity-100" : "pointer-events-none opacity-0"}`
+      : `fixed right-3 bottom-[calc(4.75rem+env(safe-area-inset-bottom))] z-[70] w-[calc(100vw-24px)] max-w-[400px] overflow-hidden rounded-xl border bg-background shadow-2xl lg:right-5 lg:bottom-5 ${visible ? "pointer-events-auto opacity-100" : "pointer-events-none opacity-0"}`
+
+    const destination = watchMode ? watchHost : document.body
+    if (destination && surface.parentElement !== destination)
+      destination.append(surface)
+  }, [surface, t, video.title, visible, watchHost, watchMode])
+
+  if (!surface) return null
+
+  return createPortal(
+    <>
       <div className="group relative aspect-video overflow-hidden bg-black text-white">
-        <img
-          src={video.thumbnailUrl}
-          alt=""
-          className="size-full object-cover"
+        <EmbeddedPlayer
+          adverts={adverts}
+          key={video.id}
+          video={video}
+          playbackState={playerPlaybackState}
+          miniPlayerMode={watchMode ? "inline" : "active"}
+          miniPlayerRestoreLabel={t("returnToVideo")}
+          miniPlayerCloseLabel={t("closeVideo")}
+          miniPlayerMuteLabel={t("mute")}
+          miniPlayerUnmuteLabel={t("unmute")}
+          onStateChange={syncCurrentPlayback}
+          onMiniPlayerRequest={state.openMiniPlayer}
+          onMiniPlayerAction={handleMiniPlayerAction}
         />
-        <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-transparent to-black/40" />
-        <div className="absolute top-2 right-2 flex gap-1">
-          <button
-            type="button"
-            aria-label={t("returnToVideo")}
-            onClick={() => router.push(watchHref)}
-            className="flex size-9 items-center justify-center rounded-full bg-black/60"
-          >
-            <Maximize2 className="size-4" />
-          </button>
-          <button
-            type="button"
-            aria-label={t("closeVideo")}
-            onClick={state.dismiss}
-            className="flex size-9 items-center justify-center rounded-full bg-black/60"
-          >
-            <X className="size-5" />
-          </button>
-        </div>
-        <button
-          type="button"
-          aria-label={t(state.isPlaying ? "pause" : "play")}
-          onClick={state.togglePlaying}
-          className="absolute top-1/2 left-1/2 flex size-12 -translate-x-1/2 -translate-y-1/2 items-center justify-center rounded-full bg-black/50"
-        >
-          {state.isPlaying ? (
-            <Pause className="size-5 fill-current" />
-          ) : (
-            <Play className="ml-0.5 size-5 fill-current" />
-          )}
-        </button>
-        <div className="absolute right-3 bottom-3 left-3 flex items-end gap-3">
+      </div>
+      {!watchMode ? (
+        <div className="flex min-h-16 items-center bg-background px-4 py-2.5 text-foreground">
           <div className="min-w-0 flex-1">
-            <p className="truncate text-sm font-bold">{video.title}</p>
-            {video.channel ? (
-              <p className="truncate text-xs text-white/70">
+            <p className="truncate text-sm font-medium">{video.title}</p>
+            {video.channel?.name ? (
+              <p className="truncate text-xs text-muted-foreground">
                 {video.channel.name}
               </p>
             ) : null}
           </div>
-          <button
-            type="button"
-            aria-label={t(state.muted ? "unmute" : "mute")}
-            onClick={state.toggleMuted}
-            className="flex size-9 items-center justify-center rounded-full bg-black/50"
-          >
-            {state.muted ? (
-              <VolumeX className="size-4" />
-            ) : (
-              <Volume2 className="size-4" />
-            )}
-          </button>
         </div>
-      </div>
-      <div className="h-1 bg-muted">
-        <div className="h-full bg-primary" style={{ width: `${progress}%` }} />
-      </div>
-    </aside>
+      ) : null}
+    </>,
+    surface
   )
 }

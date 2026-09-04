@@ -1,10 +1,12 @@
 import "server-only";
 
 import { DEFAULT_AUTH_SETTING } from "@workspace/core/config";
+import type { AdvertSettings } from "@workspace/core/validators";
 import { cache } from "react";
 
 type KnownSettings = {
     auth_setting: typeof DEFAULT_AUTH_SETTING;
+    advert_hobby: AdvertSettings;
 };
 
 type Settings = Record<string, unknown>;

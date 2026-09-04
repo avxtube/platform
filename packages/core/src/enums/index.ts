@@ -32,3 +32,11 @@ export const StoragePurpose = {
 } as const
 export type StoragePurpose =
   (typeof StoragePurpose)[keyof typeof StoragePurpose]
+
+export const AdsImageShowOn = {
+  READY: "ready",
+  END: "end",
+  PAUSE: "pause",
+} as const
+export type AdsImageShowOn =
+  (typeof AdsImageShowOn)[keyof typeof AdsImageShowOn]

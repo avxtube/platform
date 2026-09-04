@@ -21,6 +21,7 @@ export type AdminContent = {
   mediaIds?: string[]
   termIds?: string[]
   actorIds?: string[]
+  thumbnailUrl?: string
   metadata?: Record<string, unknown>
   relations?: ContentRelations
   seo?: {
