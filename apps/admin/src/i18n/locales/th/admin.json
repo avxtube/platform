@@ -25,7 +25,8 @@
   "importAction": "นำเข้า",
   "importSuccess": "นำเข้าข้อมูลและแยกรายการเรียบร้อยแล้ว",
   "quickImportTitle": "นำเข้าวิดีโอแบบด่วน",
-  "quickImportDescription": "เมื่อดึงข้อมูลสำเร็จ ระบบจะตรวจสอบไฟล์สื่อและบันทึกเป็นฉบับร่างทันที",
+  "quickImportDescription": "เมื่อดึงข้อมูลสำเร็จ ระบบจะบันทึกเป็นฉบับร่างทันที โดย MissAV จะเก็บ URL และข้อมูลสื่อไว้สำหรับ proxy โดยไม่อัปโหลด ส่วนแหล่งอื่นใช้การนำเข้าเดิม",
+  "missavProxyImportNotice": "MissAV: เมื่อบันทึกจะเก็บ URL และข้อมูลสื่อลง media สำหรับทดสอบ proxy โดยยังไม่ดาวน์โหลดหรืออัปโหลด การแสดงตัวอย่างอาจยังเปิดไม่ได้จนกว่าจะมีระบบ proxy",
   "quickImportSuccess": "นำเข้าและบันทึกวิดีโอเป็นฉบับร่างเรียบร้อยแล้ว",
   "importFailed": "ไม่สามารถนำเข้าข้อมูลได้",
   "editor": {
@@ -66,7 +67,11 @@
   "publishing": "การเผยแพร่",
   "seo": "SEO",
   "metadata": "ข้อมูลกำหนดเอง",
-  "metadataHelp": "ใช้ JSON ที่ถูกต้อง สามารถเพิ่ม studioId, actorIds, categoryIds, tagIds, dvdId, label หรือข้อมูลเฉพาะประเภทได้",
+  "metadataHelp": "ใช้ JSON ที่ถูกต้อง สำหรับ dvdId, label หรือข้อมูลเพิ่มเติม ส่วนช่อง หมวดหมู่ แท็ก และสื่อให้ใช้ช่องกรอกที่แยกไว้",
+  "contentStudio": "สตูดิโอ",
+  "contentActors": "นักแสดง",
+  "videoRenditions": "วิดีโอแต่ละความละเอียดที่บันทึกไว้",
+  "videoRenditionsHelp": "หนึ่ง Media ต่อหนึ่งความละเอียด หากเปลี่ยนหรือล้างแหล่งวิดีโอจะแทนที่ชุดนี้เมื่อบันทึก การแก้ไขส่วนอื่นจะคงชุดเดิมไว้",
   "metadataInvalid": "Metadata ต้องเป็น JSON object ที่ถูกต้อง",
   "metadataRequired": "กรุณากรอก {field}",
   "metadataListHelp": "กรอกหนึ่งค่าต่อหนึ่งบรรทัด หรือคั่นแต่ละค่าด้วยจุลภาค",
@@ -219,5 +224,48 @@
   "moderation": {
     "active": "ใช้งานปกติ",
     "suspended": "ระงับ"
+  },
+  "settings": {
+    "title": "ตั้งค่า",
+    "description": "จัดการการตั้งค่าระบบ แยกตามหมวดหมู่",
+    "configure": "ตั้งค่า",
+    "back": "การตั้งค่า",
+    "save": "บันทึกการตั้งค่า",
+    "saving": "กำลังบันทึก…",
+    "saved": "บันทึกการตั้งค่าโดเมนแล้ว",
+    "saveFailed": "บันทึกการตั้งค่าไม่สำเร็จ กรุณาลองอีกครั้ง",
+    "reset": "ยกเลิกการแก้ไข",
+    "unsaved": "มีการเปลี่ยนแปลงที่ยังไม่ได้บันทึก",
+    "noChanges": "ไม่มีการเปลี่ยนแปลงที่รอบันทึก",
+    "invalidForm": "กรุณาตรวจสอบช่องที่ระบุ",
+    "invalidOrigin": "กรอกโดเมน เช่น cdn.example.com ระบุพอร์ตได้ แต่ไม่ใส่ path, query หรือชื่อผู้ใช้/รหัสผ่าน หรือเว้นว่างไว้",
+    "invalidEndpoint": "กรอก URL แบบ HTTP(S) โดยไม่ใส่ชื่อผู้ใช้/รหัสผ่าน, query หรือ fragment หรือเว้นว่างไว้",
+    "accessDenied": "เซสชันหมดอายุหรือไม่มีสิทธิ์ กรุณาเข้าสู่ระบบอีกครั้ง",
+    "domain": {
+      "title": "โดเมน",
+      "description": "กำหนดโดเมนสำหรับวิดีโอ m3u8 สื่อ Static และบริการภายใน",
+      "notice": "Import อ่านค่า Scraping ที่บันทึกไว้ทุกครั้ง ไม่ใช้ SCRAPER_API แล้ว ส่วนโดเมนสื่อเก็บไว้สำหรับเชื่อมระบบสื่อ/Proxy ภายหลัง โดยยังไม่เปลี่ยน DNS ระบบล็อกอิน หรือ URL สื่อเดิม",
+      "roles": "โดเมนตามหน้าที่",
+      "rolesHelp": "กรอกเฉพาะโดเมน ไม่ต้องใส่ http:// หรือ https:// เว้นว่างได้หากยังไม่ได้ตั้งค่า และระบุพอร์ตสำหรับทดสอบในเครื่องได้",
+      "scraping": "บริการดึงข้อมูล"
+    },
+    "fields": {
+      "domain_content": {
+        "label": "Content Domain",
+        "help": "โดเมนสำหรับให้บริการไฟล์วิดีโอ"
+      },
+      "domain_static": {
+        "label": "Static Domain",
+        "help": "โดเมนสำหรับเรียก image, trailer, gallery และ subtitle"
+      },
+      "domain_playlist": {
+        "label": "Playlist Domain",
+        "help": "โดเมนสำหรับเรียก playlist แบบ m3u8"
+      },
+      "url_scraping": {
+        "label": "Scraping URL",
+        "help": "กรอก URL บริการ เช่น http://localhost:8081 โดยไม่ต้องมี / ปิดท้าย ระบบ Import จะต่อ /scraper ให้เอง ไม่ควรใส่รหัสผ่านหรือ API key"
+      }
+    }
   }
 }

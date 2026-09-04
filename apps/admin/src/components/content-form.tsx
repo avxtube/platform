@@ -38,7 +38,16 @@ import {
   preparePendingVideoImport,
   type PendingMediaSelection,
 } from "@workspace/media/react"
-import type { MediaUploadResult } from "@workspace/media"
+import {
+  remoteMediaIdFields,
+  type MediaUploadResult,
+  type MissavMediaImport,
+} from "@workspace/media"
+import {
+  prepareMissavMediaImport,
+  registerImportedMissavMedia,
+  isMissavProxyImport,
+} from "@/lib/missav-media-import"
 
 import { MetadataFields } from "@/components/metadata/fields"
 import {
@@ -63,17 +72,10 @@ import {
 import { createPendingChannelValue } from "@/components/metadata/pending-channels"
 import { createPendingTermValue } from "@/components/metadata/pending-terms"
 import type { AdminContent, ContentKind } from "@/lib/content"
+import { contentEditorReferences, editorMetadata } from "@/lib/content-editor"
 
-const statuses = [
-  "draft",
-  "processing",
-  "scheduled",
-  "published",
-  "ended",
-  "failed",
-] as const
+const statuses = ["draft", "processing", "published", "failed"] as const
 const visibilities = ["public", "unlisted", "private"] as const
-const moderationStatuses = ["active", "suspended"] as const
 
 export function ContentForm({
   kind,
@@ -94,8 +96,8 @@ export function ContentForm({
     terms: PendingTerm[]
   } | null>(null)
   const initialMetadata = React.useMemo(
-    () => splitMetadata(kind, content?.metadata ?? {}),
-    [content?.metadata, kind]
+    () => splitMetadata(kind, editorMetadata(content)),
+    [content, kind]
   )
   const [registeredMetadata, setRegisteredMetadata] = React.useState<
     Record<string, unknown>
@@ -104,8 +106,11 @@ export function ContentForm({
     Record<string, PendingMediaSelection>
   >({})
   const [mediaReferrerUrl, setMediaReferrerUrl] = React.useState<string>()
+  const [missavImport, setMissavImport] =
+    React.useState<MissavMediaImport | null>(null)
   const pendingMediaRef = React.useRef(pendingMedia)
   const committedMediaRef = React.useRef<Record<string, MediaUploadResult>>({})
+  const uploadedMediaRef = React.useRef(new Map<string, string>())
   const [customMetadata, setCustomMetadata] = React.useState(() =>
     JSON.stringify(initialMetadata.custom, null, 2)
   )
@@ -114,18 +119,11 @@ export function ContentForm({
   const [descriptionBody, setDescriptionBody] = React.useState(
     content?.description ?? ""
   )
-  const [status, setStatus] = React.useState(content?.status ?? "draft")
+  const [status, setStatus] = React.useState(
+    () => statuses.find((value) => value === content?.status) ?? "draft"
+  )
   const [visibility, setVisibility] = React.useState(
     content?.visibility ?? "private"
-  )
-  const [moderationStatus, setModerationStatus] = React.useState(
-    content?.moderationStatus ?? "active"
-  )
-  const [publishedAt, setPublishedAt] = React.useState(
-    localDate(content?.publishedAt)
-  )
-  const [scheduledAt, setScheduledAt] = React.useState(
-    localDate(content?.scheduledAt)
   )
   const slugManuallyEdited = React.useRef(Boolean(content?.slug))
 
@@ -172,9 +170,6 @@ export function ContentForm({
       description: nullableText(descriptionBody),
       status,
       visibility,
-      moderationStatus,
-      publishedAt: isoDate(publishedAt),
-      scheduledAt: isoDate(scheduledAt),
       metadata: metadataValue,
       seo:
         kind === "post"
@@ -205,15 +200,18 @@ export function ContentForm({
 
   async function applyImportedVideo(result: VideoImportResult) {
     const data = result.data
+    const remoteImport = prepareMissavMediaImport(result)
     const importedSourceUrl = cleanImportedUrl(
-      data.sourceUrl ?? result.url ?? ""
+      remoteImport?.sourcePageUrl ?? data.sourceUrl ?? result.url ?? ""
     )
     if (importedSourceUrl) setMediaReferrerUrl(importedSourceUrl)
 
-    const importedVideoUrl = cleanImportedUrl(data.m3u8Url ?? "")
+    const importedVideoUrl =
+      remoteImport?.assets.find((asset) => asset.purpose === "video")
+        ?.sourceUrl ?? cleanImportedUrl(data.m3u8Url ?? "")
     const videoImportSource = importedSourceUrl || importedVideoUrl
     let preparedVideo: PendingMediaSelection | undefined
-    if (videoImportSource) {
+    if (videoImportSource && !remoteImport) {
       preparedVideo = preparePendingVideoImport({
         sourceUrl: videoImportSource,
         previewUrl: importedVideoUrl || videoImportSource,
@@ -232,7 +230,7 @@ export function ContentForm({
     }
 
     let preparedPoster: PendingMediaSelection | undefined
-    if (data.poster) {
+    if (data.poster && !remoteImport) {
       const poster = await preparePendingImageFromUrl({
         sourceUrl: cleanImportedUrl(data.poster),
         purpose: "poster",
@@ -252,7 +250,7 @@ export function ContentForm({
       })
     }
     let preparedTrailer: PendingMediaSelection | undefined
-    if (data.trailer) {
+    if (data.trailer && !remoteImport) {
       preparedTrailer = await preparePendingVideoFromUrl({
         sourceUrl: cleanImportedUrl(data.trailer),
         referrerUrl: importedSourceUrl || undefined,
@@ -266,6 +264,21 @@ export function ContentForm({
           delete next[previousToken]
         }
         next[preparedTrailer!.token] = preparedTrailer!
+        return next
+      })
+    }
+    setMissavImport(remoteImport)
+    if (remoteImport) {
+      setPendingMedia((current) => {
+        const next = { ...current }
+        for (const field of ["sourceUrl", "thumbnailUrl", "trailerUrl"]) {
+          const token = registeredMetadata[field]
+          if (isPendingMediaToken(token)) {
+            const previous = next[token]
+            if (previous) releasePendingPreview(previous)
+            delete next[token]
+          }
+        }
         return next
       })
     }
@@ -283,6 +296,9 @@ export function ContentForm({
     const directors = importedNames(data.directors)
     setRegisteredMetadata((current) => ({
       ...current,
+      ...(remoteImport
+        ? { sourceUrl: "", thumbnailUrl: "", trailerUrl: "" }
+        : {}),
       ...(data.code ? { dvdId: data.code } : {}),
       ...(data.releaseDate ? { releaseDate: data.releaseDate } : {}),
       ...(typeof data.duration === "number"
@@ -298,7 +314,11 @@ export function ContentForm({
         : data.poster
           ? { thumbnailUrl: cleanImportedUrl(data.poster) }
           : {}),
-      ...(preparedTrailer ? { trailerUrl: preparedTrailer.token } : {}),
+      ...(preparedTrailer
+        ? { trailerUrl: preparedTrailer.token }
+        : remoteImport && data.trailer
+          ? { trailerUrl: cleanImportedUrl(data.trailer) }
+          : {}),
       ...(studios[0]
         ? { studioId: createPendingChannelValue("studio", studios[0]) }
         : {}),
@@ -327,6 +347,8 @@ export function ContentForm({
     } catch {
       // Keep the imported data usable even if the custom JSON was temporarily invalid.
     }
+    for (const field of Object.values(remoteMediaIdFields))
+      delete existingCustom[field]
     setCustomMetadata(
       JSON.stringify(
         {
@@ -334,6 +356,9 @@ export function ContentForm({
           ...(directors.length ? { directors } : {}),
           import: {
             sourceUrl: importedSourceUrl,
+            ...(remoteImport
+              ? { sourceProvider: "missav", mediaMode: "proxy" }
+              : {}),
             parser: result.parser ?? null,
             importedAt: result.timestamp ?? new Date().toISOString(),
           },
@@ -348,7 +373,13 @@ export function ContentForm({
     setPending(true)
     try {
       const metadata = await commitMediaInMetadata(payload.metadata)
-      const finalPayload = { ...payload, metadata }
+      const references = contentEditorReferences(metadata, content)
+      for (const value of Object.values(metadata)) {
+        if (typeof value !== "string") continue
+        const id = uploadedMediaRef.current.get(value)
+        if (id) references.mediaIds.push(id)
+      }
+      const finalPayload = { ...payload, ...references, metadata }
       const url = content
         ? `/api/v1/admin/contents/${encodeURIComponent(content._id)}`
         : "/api/v1/admin/contents"
@@ -376,7 +407,14 @@ export function ContentForm({
   async function commitMediaInMetadata(metadata: Record<string, unknown>) {
     let resolvedMetadata = metadata
     const trailerUrl = metadata.trailerUrl
-    if (isFourhoiUrl(trailerUrl)) {
+    const existingTrailer = content?.relations?.media.some(
+      (item) => item.position === "trailer" && item.url === trailerUrl
+    )
+    if (
+      isFourhoiUrl(trailerUrl) &&
+      !isMissavProxyImport(metadata) &&
+      !existingTrailer
+    ) {
       const uploaded = await commitPendingMedia(
         await preparePendingVideoFromUrl({
           sourceUrl: trailerUrl,
@@ -385,6 +423,7 @@ export function ContentForm({
         { keySlug: slug }
       )
       resolvedMetadata = { ...resolvedMetadata, trailerUrl: uploaded.url }
+      if (uploaded.id) uploadedMediaRef.current.set(uploaded.url, uploaded.id)
     }
 
     const tokens = collectPendingMediaTokens(resolvedMetadata)
@@ -395,6 +434,7 @@ export function ContentForm({
         committedMediaRef.current[token] ??
         (await commitPendingMedia(selection, { keySlug: slug }))
       committedMediaRef.current[token] = uploaded
+      if (uploaded.id) uploadedMediaRef.current.set(uploaded.url, uploaded.id)
       resolvedMetadata = replacePendingMediaToken(
         resolvedMetadata,
         token,
@@ -421,7 +461,7 @@ export function ContentForm({
       pendingMediaRef.current = remainingMedia
       setPendingMedia(remainingMedia)
     }
-    return resolvedMetadata
+    return registerImportedMissavMedia(resolvedMetadata, missavImport)
   }
 
   async function confirmChannelsAndSave() {
@@ -553,36 +593,6 @@ export function ContentForm({
               </option>
             ))}
           </SelectField>
-          <SelectField
-            id={`${idPrefix}-moderation-status`}
-            label={t("moderationStatus")}
-            value={moderationStatus}
-            onChange={(value) =>
-              setModerationStatus(value as (typeof moderationStatuses)[number])
-            }
-          >
-            {moderationStatuses.map((item) => (
-              <option key={item} value={item}>
-                {t(`moderation.${item}`)}
-              </option>
-            ))}
-          </SelectField>
-          <Field label={t("publishedAt")} htmlFor={`${idPrefix}-published-at`}>
-            <Input
-              id={`${idPrefix}-published-at`}
-              type="datetime-local"
-              value={publishedAt}
-              onChange={(event) => setPublishedAt(event.target.value)}
-            />
-          </Field>
-          <Field label={t("scheduledAt")} htmlFor={`${idPrefix}-scheduled-at`}>
-            <Input
-              id={`${idPrefix}-scheduled-at`}
-              type="datetime-local"
-              value={scheduledAt}
-              onChange={(event) => setScheduledAt(event.target.value)}
-            />
-          </Field>
           <SubmitButton
             pending={pending}
             editing={Boolean(content)}
@@ -701,6 +711,11 @@ export function ContentForm({
                 onImported={applyImportedVideo}
               />
             ) : null}
+            {missavImport ? (
+              <p role="status" className="text-xs text-muted-foreground">
+                {t("missavProxyImportNotice")}
+              </p>
+            ) : null}
             <div className="overflow-hidden rounded-lg bg-card shadow-xs ring-1 ring-foreground/10">
               <Input
                 id="title"
@@ -759,6 +774,67 @@ export function ContentForm({
                   includeFieldIds={mainMediaFieldIds}
                   disabled={pending}
                 />
+                {kind === "video" &&
+                content?.relations?.media.some(
+                  (item) => item.position === "video"
+                ) ? (
+                  <AdminMetabox
+                    title={t("videoRenditions")}
+                    description={t("videoRenditionsHelp")}
+                  >
+                    <div className="space-y-2">
+                      {content.relations.media
+                        .filter((item) => item.position === "video")
+                        .map((item) => (
+                          <div
+                            key={item.id}
+                            className="flex min-w-0 items-center gap-3 rounded-lg border p-3 text-xs"
+                          >
+                            <span className="shrink-0 font-medium">
+                              {item.quality === "original"
+                                ? "Original"
+                                : item.quality
+                                  ? `${item.quality}p`
+                                  : "—"}
+                            </span>
+                            <span
+                              className="min-w-0 flex-1 truncate"
+                              title={item.url ?? item.id}
+                            >
+                              {item.url ?? item.id}
+                            </span>
+                            <span className="shrink-0 text-muted-foreground">
+                              {item.provider}
+                            </span>
+                          </div>
+                        ))}
+                    </div>
+                  </AdminMetabox>
+                ) : null}
+                {kind === "video" || kind === "short" ? (
+                  <>
+                    <MetadataFields
+                      scope={kind}
+                      value={registeredMetadata}
+                      onChange={setRegisteredMetadata}
+                      relationOptions={content?.relations}
+                      disabled={pending}
+                      variant="metabox"
+                      includeFieldIds={["studioId"]}
+                      title={t("contentStudio")}
+                    />
+                    <MetadataFields
+                      scope={kind}
+                      value={registeredMetadata}
+                      onChange={setRegisteredMetadata}
+                      relationOptions={content?.relations}
+                      disabled={pending}
+                      variant="metabox"
+                      includeFieldIds={["actorIds"]}
+                      title={t("contentActors")}
+                    />
+                  </>
+                ) : null}
                 <MetadataFields
                   scope={kind}
                   value={registeredMetadata}
@@ -770,6 +846,9 @@ export function ContentForm({
                     ...contentMediaFieldIds[kind],
                     "categoryIds",
                     "tagIds",
+                    ...(kind === "video" || kind === "short"
+                      ? ["studioId", "actorIds"]
+                      : []),
                   ]}
                 />
                 <AdminMetabox
@@ -923,9 +1002,6 @@ type ContentPayload = {
   description: string | null
   status: string
   visibility: string
-  moderationStatus: string
-  publishedAt: string | null
-  scheduledAt: string | null
   metadata: Record<string, unknown>
   seo: {
     metaTitle: string | null
@@ -1130,14 +1206,4 @@ function isFourhoiUrl(value: unknown): value is string {
   } catch {
     return false
   }
-}
-function isoDate(value: FormDataEntryValue | null) {
-  if (typeof value !== "string" || !value) return null
-  return new Date(value).toISOString()
-}
-function localDate(value?: string) {
-  if (!value) return ""
-  const date = new Date(value)
-  const offset = date.getTimezoneOffset() * 60_000
-  return new Date(date.getTime() - offset).toISOString().slice(0, 16)
 }

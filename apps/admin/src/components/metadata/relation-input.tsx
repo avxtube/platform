@@ -4,11 +4,21 @@ import * as React from "react"
 import { Check, GripVertical, Loader2, Plus, X } from "lucide-react"
 import { useTranslations } from "next-intl"
 
-import { Avatar, AvatarFallback, AvatarImage, Badge, Button, Input } from "@workspace/ui/components"
+import {
+  Avatar,
+  AvatarFallback,
+  AvatarImage,
+  Badge,
+  Button,
+  Input,
+} from "@workspace/ui/components"
 
 import { useRelationOptions, type RelationKind } from "./hooks"
 import type { ContentRelations } from "@/lib/content"
-import { createPendingChannelValue, parsePendingChannelValue } from "./pending-channels"
+import {
+  createPendingChannelValue,
+  parsePendingChannelValue,
+} from "./pending-channels"
 import { createPendingTermValue, parsePendingTermValue } from "./pending-terms"
 
 export function MetadataRelationInput({
@@ -36,25 +46,67 @@ export function MetadataRelationInput({
   const [debouncing, setDebouncing] = React.useState(false)
   const [activeIndex, setActiveIndex] = React.useState(-1)
   const [draggedValue, setDraggedValue] = React.useState<string | null>(null)
-  const [confirmedMissingTerms, setConfirmedMissingTerms] = React.useState<Set<string>>(() => new Set())
+  const [confirmedMissingTerms, setConfirmedMissingTerms] = React.useState<
+    Set<string>
+  >(() => new Set())
   const uncheckedTermKeys = React.useRef(new Set<string>())
   const currentValue = React.useRef(value)
   const isTerm = kind === "category" || kind === "tag"
   const canCreate = kind !== "video"
   const existingIds = value.filter((item) => !parsePendingValue(item))
-  const resolvedInitialOptions = React.useMemo(() => [
-    ...(initialOptions?.channels ?? []).map((channel) => ({ id: channel.id, name: channel.name, description: `@${channel.handle.replace(/^@/, "")}`, avatarUrl: channel.avatarUrl, kind: channel.kind })),
-    ...(initialOptions?.terms ?? []).map((term) => ({ id: term.id, name: term.name, description: term.slug, avatarUrl: null, kind: term.taxonomy })),
-    ...(initialOptions?.contents ?? []).map((content) => ({ id: content.id, name: content.title, description: content.slug, avatarUrl: null, kind: content.kind })),
-  ].filter((option) => option.kind === kind), [initialOptions, kind])
-  const { options, searching, search, addOptions } = useRelationOptions(kind, existingIds, resolvedInitialOptions)
-  const optionById = React.useMemo(() => new Map(options.map((option) => [option.id, option])), [options])
+  const resolvedInitialOptions = React.useMemo(
+    () =>
+      [
+        ...(initialOptions?.channels ?? [])
+          .filter((channel) =>
+            channel.positions.includes(kind === "actor" ? "actors" : kind)
+          )
+          .map((channel) => ({
+            id: channel.id,
+            name: channel.name,
+            description: `@${channel.handle.replace(/^@/, "")}`,
+            avatarUrl: channel.avatarUrl,
+            kind,
+          })),
+        ...(initialOptions?.terms ?? []).map((term) => ({
+          id: term.id,
+          name: term.name,
+          description: term.slug,
+          avatarUrl: null,
+          kind: term.taxonomy,
+        })),
+        ...(initialOptions?.contents ?? []).map((content) => ({
+          id: content.id,
+          name: content.title,
+          description: content.slug,
+          avatarUrl: null,
+          kind: content.kind,
+        })),
+      ].filter((option) => option.kind === kind),
+    [initialOptions, kind]
+  )
+  const { options, searching, search, addOptions } = useRelationOptions(
+    kind,
+    existingIds,
+    resolvedInitialOptions
+  )
+  const optionById = React.useMemo(
+    () => new Map(options.map((option) => [option.id, option])),
+    [options]
+  )
   const normalizedQuery = query.trim().replace(/\s+/g, " ")
   const canSearch = normalizedQuery.length >= 2
   const open = !isTerm && canSearch && !disabled
-  const exactOption = options.find((option) =>
-    option.name.localeCompare(normalizedQuery, undefined, { sensitivity: "base" }) === 0 ||
-    option.description.replace(/^@/, "").localeCompare(normalizedQuery.replace(/^@/, ""), undefined, { sensitivity: "base" }) === 0
+  const exactOption = options.find(
+    (option) =>
+      option.name.localeCompare(normalizedQuery, undefined, {
+        sensitivity: "base",
+      }) === 0 ||
+      option.description
+        .replace(/^@/, "")
+        .localeCompare(normalizedQuery.replace(/^@/, ""), undefined, {
+          sensitivity: "base",
+        }) === 0
   )
 
   React.useEffect(() => {
@@ -66,7 +118,8 @@ export function MetadataRelationInput({
       if (!rootRef.current?.contains(event.target as Node)) setQuery("")
     }
     document.addEventListener("pointerdown", closeOnOutsideClick)
-    return () => document.removeEventListener("pointerdown", closeOnOutsideClick)
+    return () =>
+      document.removeEventListener("pointerdown", closeOnOutsideClick)
   }, [])
 
   React.useEffect(() => {
@@ -101,16 +154,27 @@ export function MetadataRelationInput({
     for (const inputName of names) {
       const name = inputName.trim().replace(/\s+/g, " ")
       if (!name) continue
-      const existing = options.find((option) =>
-        option.name.localeCompare(name, undefined, { sensitivity: "base" }) === 0 ||
-        option.description.replace(/^@/, "").localeCompare(name.replace(/^@/, ""), undefined, { sensitivity: "base" }) === 0
+      const existing = options.find(
+        (option) =>
+          option.name.localeCompare(name, undefined, {
+            sensitivity: "base",
+          }) === 0 ||
+          option.description
+            .replace(/^@/, "")
+            .localeCompare(name.replace(/^@/, ""), undefined, {
+              sensitivity: "base",
+            }) === 0
       )
       const valueToAdd = existing?.id ?? createPendingValue(kind, name)
       const duplicate = nextValues.some((item) => {
         if (item === valueToAdd) return true
         const pending = parsePendingValue(item)
         const option = optionById.get(item)
-        return (pending?.name ?? option?.name)?.localeCompare(name, undefined, { sensitivity: "base" }) === 0
+        return (
+          (pending?.name ?? option?.name)?.localeCompare(name, undefined, {
+            sensitivity: "base",
+          }) === 0
+        )
       })
       if (duplicate) continue
 
@@ -122,7 +186,7 @@ export function MetadataRelationInput({
 
     const nextValue = multiple ? nextValues : nextValues.slice(0, 1)
     currentValue.current = nextValue
-    onChange(multiple ? nextValue : nextValue[0] ?? "")
+    onChange(multiple ? nextValue : (nextValue[0] ?? ""))
     return nextValue
   }
 
@@ -168,7 +232,15 @@ export function MetadataRelationInput({
         body: JSON.stringify({ terms }),
       })
       if (!response.ok) return
-      const result = await response.json() as { terms: Array<{ key: string; id: string; name: string; slug: string; taxonomy: "category" | "tag" }> }
+      const result = (await response.json()) as {
+        terms: Array<{
+          key: string
+          id: string
+          name: string
+          slug: string
+          taxonomy: "category" | "tag"
+        }>
+      }
       const resolved = new Map(result.terms.map((term) => [term.key, term.id]))
       setConfirmedMissingTerms((current) => {
         const nextMissing = new Set(current)
@@ -178,10 +250,20 @@ export function MetadataRelationInput({
         })
         return nextMissing
       })
-      addOptions(result.terms.map((term) => ({ id: term.id, name: term.name, description: term.slug, avatarUrl: null, kind: term.taxonomy })))
+      addOptions(
+        result.terms.map((term) => ({
+          id: term.id,
+          name: term.name,
+          description: term.slug,
+          avatarUrl: null,
+          kind: term.taxonomy,
+        }))
+      )
       terms.forEach((term) => uncheckedTermKeys.current.delete(term.key))
       if (!resolved.size) return
-      const next = currentValue.current.map((item) => resolved.get(item) ?? item)
+      const next = currentValue.current.map(
+        (item) => resolved.get(item) ?? item
+      )
       currentValue.current = next
       onChange(next)
     } catch {
@@ -190,17 +272,29 @@ export function MetadataRelationInput({
   }
 
   function createPending() {
-    if (!canCreate || !normalizedQuery || exactOption || searching || debouncing) return
+    if (
+      !canCreate ||
+      !normalizedQuery ||
+      exactOption ||
+      searching ||
+      debouncing
+    )
+      return
     const duplicate = value.some((item) => {
       const pending = parsePendingValue(item)
       const existing = optionById.get(item)
-      return (pending?.name ?? existing?.name)?.localeCompare(normalizedQuery, undefined, { sensitivity: "base" }) === 0
+      return (
+        (pending?.name ?? existing?.name)?.localeCompare(
+          normalizedQuery,
+          undefined,
+          { sensitivity: "base" }
+        ) === 0
+      )
     })
     if (!duplicate) {
       addTypedNames([normalizedQuery])
       setQuery("")
-    }
-    else setQuery("")
+    } else setQuery("")
   }
 
   function onKeyDown(event: React.KeyboardEvent<HTMLInputElement>) {
@@ -213,10 +307,16 @@ export function MetadataRelationInput({
     if (!open) return
     if (event.key === "ArrowDown" && options.length) {
       event.preventDefault()
-      setActiveIndex((current) => current < 0 ? 0 : (current + 1) % options.length)
+      setActiveIndex((current) =>
+        current < 0 ? 0 : (current + 1) % options.length
+      )
     } else if (event.key === "ArrowUp" && options.length) {
       event.preventDefault()
-      setActiveIndex((current) => current < 0 ? options.length - 1 : (current - 1 + options.length) % options.length)
+      setActiveIndex((current) =>
+        current < 0
+          ? options.length - 1
+          : (current - 1 + options.length) % options.length
+      )
     } else if (event.key === "Enter") {
       event.preventDefault()
       const option = activeIndex >= 0 ? options[activeIndex] : exactOption
@@ -229,12 +329,13 @@ export function MetadataRelationInput({
 
   return (
     <div ref={rootRef} className="relative min-w-0">
-      <div className="flex min-h-10 min-w-0 max-w-full flex-wrap items-center gap-1.5 rounded-lg border bg-background px-2 py-1.5 focus-within:ring-2 focus-within:ring-ring/30">
+      <div className="flex min-h-10 max-w-full min-w-0 flex-wrap items-center gap-1.5 rounded-lg border bg-background px-2 py-1.5 focus-within:ring-2 focus-within:ring-ring/30">
         {value.map((item) => {
           const pending = parsePendingValue(item)
           const option = optionById.get(item)
           const name = pending?.name ?? option?.name ?? item
-          const isConfirmedNew = Boolean(pending) && (!isTerm || confirmedMissingTerms.has(item))
+          const isConfirmedNew =
+            Boolean(pending) && (!isTerm || confirmedMissingTerms.has(item))
           return (
             <Badge
               key={item}
@@ -258,18 +359,37 @@ export function MetadataRelationInput({
               title={truncateLabelAt ? name : undefined}
               className={`h-7 gap-1 rounded-full pr-1 ${truncateLabelAt ? "max-w-full" : ""} ${multiple && !disabled ? "cursor-grab active:cursor-grabbing" : ""} ${draggedValue === item ? "opacity-50" : ""}`}
             >
-              {multiple ? <GripVertical className="size-3 shrink-0 text-muted-foreground" aria-hidden="true" /> : null}
-              {!isTerm ? <Avatar size="sm" className="size-5">
-                <AvatarImage src={option?.avatarUrl ?? undefined} alt="" />
-                <AvatarFallback>{initials(name)}</AvatarFallback>
-              </Avatar> : null}
-              <span className={truncateLabelAt ? "min-w-0 truncate" : undefined}>
-                {truncateLabelAt
-                  ? truncateLabel(name, truncateLabelAt)
-                  : name}
+              {multiple ? (
+                <GripVertical
+                  className="size-3 shrink-0 text-muted-foreground"
+                  aria-hidden="true"
+                />
+              ) : null}
+              {!isTerm ? (
+                <Avatar size="sm" className="size-5">
+                  <AvatarImage src={option?.avatarUrl ?? undefined} alt="" />
+                  <AvatarFallback>{initials(name)}</AvatarFallback>
+                </Avatar>
+              ) : null}
+              <span
+                className={truncateLabelAt ? "min-w-0 truncate" : undefined}
+              >
+                {truncateLabelAt ? truncateLabel(name, truncateLabelAt) : name}
               </span>
-              {isConfirmedNew ? <span className="text-[10px] text-muted-foreground">{t("metadataNewChannel")}</span> : null}
-              <Button type="button" variant="ghost" size="icon-xs" className="size-5 rounded-full" onClick={() => remove(item)} disabled={disabled} aria-label={t("metadataRemoveChannel", { name })}>
+              {isConfirmedNew ? (
+                <span className="text-[10px] text-muted-foreground">
+                  {t("metadataNewChannel")}
+                </span>
+              ) : null}
+              <Button
+                type="button"
+                variant="ghost"
+                size="icon-xs"
+                className="size-5 rounded-full"
+                onClick={() => remove(item)}
+                disabled={disabled}
+                aria-label={t("metadataRemoveChannel", { name })}
+              >
                 <X className="size-3" />
               </Button>
             </Badge>
@@ -298,12 +418,24 @@ export function MetadataRelationInput({
           onKeyDown={onKeyDown}
           onBlur={() => {
             if (!isTerm) return
-            const next = normalizedQuery ? addTypedNames([normalizedQuery]) : currentValue.current
+            const next = normalizedQuery
+              ? addTypedNames([normalizedQuery])
+              : currentValue.current
             setQuery("")
             void checkNewTerms(next)
           }}
           disabled={disabled}
-          placeholder={t(kind === "actor" ? "metadataTypeActor" : kind === "studio" ? "metadataTypeStudio" : kind === "category" ? "metadataTypeCategory" : kind === "tag" ? "metadataTypeTag" : "metadataTypeVideo")}
+          placeholder={t(
+            kind === "actor"
+              ? "metadataTypeActor"
+              : kind === "studio"
+                ? "metadataTypeStudio"
+                : kind === "category"
+                  ? "metadataTypeCategory"
+                  : kind === "tag"
+                    ? "metadataTypeTag"
+                    : "metadataTypeVideo"
+          )}
           autoComplete="off"
           className="h-7 min-w-44 flex-1 border-0 px-1 shadow-none focus-visible:ring-0"
         />
@@ -312,22 +444,62 @@ export function MetadataRelationInput({
       {open ? (
         <div className="absolute inset-x-0 top-[calc(100%+0.35rem)] z-50 max-h-72 overflow-y-auto rounded-xl border bg-popover p-1 text-popover-foreground shadow-lg">
           {searching || debouncing ? (
-            <div className="flex items-center justify-center gap-2 px-3 py-6 text-sm text-muted-foreground"><Loader2 className="size-4 animate-spin" />{t("metadataSearching")}</div>
-          ) : <>
-            {options.map((option, index) => (
-            <button key={option.id} type="button" onMouseDown={(event) => event.preventDefault()} onMouseEnter={() => setActiveIndex(index)} onClick={() => select(option.id)} className={`flex w-full items-center gap-3 rounded-lg px-3 py-2 text-left text-sm ${index === activeIndex ? "bg-muted" : "hover:bg-muted"}`}>
-              {!isTerm ? <Avatar size="sm"><AvatarImage src={option.avatarUrl ?? undefined} alt="" /><AvatarFallback>{initials(option.name)}</AvatarFallback></Avatar> : null}
-              <span className="min-w-0 flex-1"><span className="block truncate font-medium">{option.name}</span><span className="block truncate text-xs text-muted-foreground">{option.description}</span></span>
-              {value.includes(option.id) ? <Check className="size-4" /> : null}
-            </button>
-            ))}
-            {canCreate && !exactOption ? (
-            <button type="button" onMouseDown={(event) => event.preventDefault()} onClick={createPending} className="flex w-full items-center gap-3 rounded-lg px-3 py-3 text-left text-sm hover:bg-muted">
-              <span className="flex size-8 items-center justify-center rounded-full bg-muted"><Plus className="size-4" /></span>
-              <span><span className="block font-medium">{t("metadataAddNewChannel", { name: normalizedQuery })}</span><span className="block text-xs text-muted-foreground">{t("metadataPressEnter")}</span></span>
-            </button>
-            ) : null}
-          </>}
+            <div className="flex items-center justify-center gap-2 px-3 py-6 text-sm text-muted-foreground">
+              <Loader2 className="size-4 animate-spin" />
+              {t("metadataSearching")}
+            </div>
+          ) : (
+            <>
+              {options.map((option, index) => (
+                <button
+                  key={option.id}
+                  type="button"
+                  onMouseDown={(event) => event.preventDefault()}
+                  onMouseEnter={() => setActiveIndex(index)}
+                  onClick={() => select(option.id)}
+                  className={`flex w-full items-center gap-3 rounded-lg px-3 py-2 text-left text-sm ${index === activeIndex ? "bg-muted" : "hover:bg-muted"}`}
+                >
+                  {!isTerm ? (
+                    <Avatar size="sm">
+                      <AvatarImage src={option.avatarUrl ?? undefined} alt="" />
+                      <AvatarFallback>{initials(option.name)}</AvatarFallback>
+                    </Avatar>
+                  ) : null}
+                  <span className="min-w-0 flex-1">
+                    <span className="block truncate font-medium">
+                      {option.name}
+                    </span>
+                    <span className="block truncate text-xs text-muted-foreground">
+                      {option.description}
+                    </span>
+                  </span>
+                  {value.includes(option.id) ? (
+                    <Check className="size-4" />
+                  ) : null}
+                </button>
+              ))}
+              {canCreate && !exactOption ? (
+                <button
+                  type="button"
+                  onMouseDown={(event) => event.preventDefault()}
+                  onClick={createPending}
+                  className="flex w-full items-center gap-3 rounded-lg px-3 py-3 text-left text-sm hover:bg-muted"
+                >
+                  <span className="flex size-8 items-center justify-center rounded-full bg-muted">
+                    <Plus className="size-4" />
+                  </span>
+                  <span>
+                    <span className="block font-medium">
+                      {t("metadataAddNewChannel", { name: normalizedQuery })}
+                    </span>
+                    <span className="block text-xs text-muted-foreground">
+                      {t("metadataPressEnter")}
+                    </span>
+                  </span>
+                </button>
+              ) : null}
+            </>
+          )}
         </div>
       ) : null}
     </div>
@@ -335,7 +507,12 @@ export function MetadataRelationInput({
 }
 
 function initials(value: string) {
-  return value.split(/\s+/).map((part) => part[0]).join("").slice(0, 2).toUpperCase()
+  return value
+    .split(/\s+/)
+    .map((part) => part[0])
+    .join("")
+    .slice(0, 2)
+    .toUpperCase()
 }
 
 function truncateLabel(value: string, maxLength = 30) {

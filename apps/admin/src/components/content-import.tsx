@@ -22,6 +22,8 @@ export type ImportedVideoData = {
   directors?: unknown
   genres?: unknown
   labels?: unknown
+  video?: unknown
+  thumbnail?: unknown
 }
 
 export type VideoImportResult = {

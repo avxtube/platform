@@ -55,11 +55,12 @@ async function ChannelAbout({ data, locale }: { data: ChannelDetailResponse; loc
   const t = await getTranslations({ locale, namespace: "video.channel" })
   const number = new Intl.NumberFormat(locale, { notation: "compact", maximumFractionDigits: 1 })
   const date = new Intl.DateTimeFormat(locale, { day: "numeric", month: "long", year: "numeric", timeZone: "Asia/Bangkok" }).format(new Date(data.channel.joinedAt))
-  const profileItems = data.channel.profile.kind === "actor"
-    ? data.channel.profile.genres
-    : data.channel.profile.kind === "studio"
-      ? data.channel.profile.specialties
-      : data.channel.profile.topics
+  const metadata = data.channel.metadata
+  const profileItems = (data.channel.kind === "person"
+    ? metadata?.genres
+    : data.channel.kind === "organization"
+      ? metadata?.specialties
+      : metadata?.topics) ?? []
 
   return (
     <section className="grid gap-10 py-8 lg:grid-cols-[minmax(0,1fr)_320px]">

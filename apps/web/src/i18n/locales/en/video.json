@@ -217,7 +217,7 @@
     "empty": "No watch history matches this filter."
   },
   "channel": {
-    "kind": { "creator": "Creator", "actor": "Actor", "studio": "Studio" },
+    "kind": { "person": "Person", "organization": "Organization", "page": "Page", "creator": "Creator", "actor": "Actor", "studio": "Studio" },
     "verified": "Verified channel",
     "follow": "Follow",
     "following": "Following",

@@ -2,6 +2,10 @@
 
 import { useTranslations } from "next-intl"
 import { useRouter } from "next/navigation"
+import {
+  prepareMissavMediaImport,
+  registerImportedMissavMedia,
+} from "@/lib/missav-media-import"
 
 import {
   ContentImport,
@@ -19,33 +23,56 @@ export function QuickContentImport() {
 
   async function saveImportedVideo(result: VideoImportResult) {
     const data = result.data
-    const sourcePageUrl = cleanImportedUrl(data.sourceUrl ?? result.url ?? "")
-    const sourceVideoUrl = cleanImportedUrl(data.m3u8Url ?? "")
+    const remoteImport = prepareMissavMediaImport(result)
+    const sourcePageUrl = cleanImportedUrl(
+      remoteImport?.sourcePageUrl ?? data.sourceUrl ?? result.url ?? ""
+    )
+    const sourceVideoUrl =
+      remoteImport?.assets.find((asset) => asset.purpose === "video")
+        ?.sourceUrl ?? cleanImportedUrl(data.m3u8Url ?? "")
     const slug = toSlug(data.slug || data.code || data.title || "")
 
     // External media must finish before relation records may be created.
-    const [video, poster, trailer] = await Promise.all([
-      sourcePageUrl || sourceVideoUrl
-        ? importVdoHide(sourcePageUrl || sourceVideoUrl, sourceVideoUrl)
-        : undefined,
-      data.poster
-        ? importMediaUrl({
-            purpose: "poster",
-            url: cleanImportedUrl(data.poster),
-            referrerUrl: sourcePageUrl,
-            keySlug: slug,
-            imageMode: "fit",
-          })
-        : undefined,
-      data.trailer
-        ? importMediaUrl({
-            purpose: "trailer",
-            url: cleanImportedUrl(data.trailer),
-            referrerUrl: sourcePageUrl || "https://missav.ai/",
-            keySlug: slug,
-          })
-        : undefined,
-    ])
+    const [video, poster, trailer] = remoteImport
+      ? [
+          sourceVideoUrl ? { url: sourceVideoUrl } : undefined,
+          data.poster ? { url: cleanImportedUrl(data.poster) } : undefined,
+          data.trailer ? { url: cleanImportedUrl(data.trailer) } : undefined,
+        ]
+      : await Promise.all([
+          sourcePageUrl || sourceVideoUrl
+            ? importVdoHide(sourcePageUrl || sourceVideoUrl, sourceVideoUrl)
+            : undefined,
+          data.poster
+            ? importMediaUrl({
+                purpose: "poster",
+                url: cleanImportedUrl(data.poster),
+                referrerUrl: sourcePageUrl,
+                keySlug: slug,
+                imageMode: "fit",
+              })
+            : undefined,
+          data.trailer
+            ? importMediaUrl({
+                purpose: "trailer",
+                url: cleanImportedUrl(data.trailer),
+                referrerUrl: sourcePageUrl || "https://missav.ai/",
+                keySlug: slug,
+              })
+            : undefined,
+        ])
+
+    // Register all remote descriptors before creating studios, actors or terms.
+    const remoteMetadata = remoteImport
+      ? await registerImportedMissavMedia(
+          {
+            ...(video ? { sourceUrl: video.url } : {}),
+            ...(poster ? { thumbnailUrl: poster.url } : {}),
+            ...(trailer ? { trailerUrl: trailer.url } : {}),
+          },
+          remoteImport
+        )
+      : {}
 
     const studios = importedNames(data.makers).slice(0, 1)
     const actors = importedNames(data.actresses)
@@ -113,7 +140,16 @@ export function QuickContentImport() {
         moderationStatus: "active",
         publishedAt: null,
         scheduledAt: null,
-        metadata,
+        metadata: {
+          ...metadata,
+          ...remoteMetadata,
+          import: {
+            ...metadata.import,
+            ...(remoteImport
+              ? { sourceProvider: "missav", mediaMode: "proxy" }
+              : {}),
+          },
+        },
         seo: { metaTitle: null, metaDescription: null, keywords: [] },
       }),
     })

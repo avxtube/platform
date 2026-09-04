@@ -81,22 +81,26 @@ export async function storeMediaFile({
   const key = `${datePath}/${fileSlug}.${extension}`
   const size = body?.byteLength ?? source.size
   const url = mediaPublicUrl(storage, key)
-  const mediaRecord = await MediaModel.create({
+  const mediaRecord = new MediaModel({
     _id: id,
     kind: rule.kind,
-    purpose,
+    purpose:
+      purpose === "short-poster"
+        ? "poster"
+        : purpose === "live"
+          ? "video"
+          : purpose,
     provider: storage.provider,
-    status: "processing",
     storageId: storage._id,
-    sourceUrl,
-    url,
-    key,
-    originalName,
-    mimeType: outputMimeType,
-    size,
-    width,
-    height,
-    createdBy,
+    ...(rule.kind === "video" ? { quality: "original" } : {}),
+    metadata: {
+      directUrl: url,
+      sourcePageUrl: sourceUrl,
+      title: originalName,
+      size,
+      width,
+      height,
+    },
   })
 
   try {
@@ -123,10 +127,9 @@ export async function storeMediaFile({
         client.destroy()
       }
     }
-    mediaRecord.status = "ready"
+    mediaRecord.error = undefined
     await mediaRecord.save()
   } catch (error) {
-    mediaRecord.status = "failed"
     mediaRecord.error = error instanceof Error ? error.message : "Upload failed"
     await mediaRecord.save().catch(() => undefined)
     throw error

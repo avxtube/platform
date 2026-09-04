@@ -19,6 +19,8 @@
     "./config": "./src/config/index.ts",
     "./enums": "./src/enums/index.ts",
     "./types": "./src/types/index.ts",
+    "./types/channel": "./src/types/channel.ts",
+    "./types/content": "./src/types/content.ts",
     "./utils": "./src/utils/index.ts",
     "./validators": "./src/validators/index.ts"
   }

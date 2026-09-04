@@ -1,12 +1,9 @@
 import {
   CONTENT_KINDS,
-  CONTENT_MODERATION_STATUSES,
   CONTENT_STATUSES,
   CONTENT_VISIBILITIES,
-  ChannelModel,
   ContentModel,
   MediaModel,
-  TermModel,
 } from "@workspace/db/models"
 import { Router, type NextFunction, type Request, type Response } from "express"
 
@@ -15,7 +12,10 @@ import {
   getRequestActor,
   requireAdmin,
 } from "../middlewares/user-access.middleware"
-import { mockChannels } from "../data/mock-channels"
+import {
+  prepareContentReferences,
+  resolveContentRelations,
+} from "../services/content-relations.service"
 
 const router: Router = Router()
 
@@ -77,7 +77,7 @@ router.get(
         return
       }
 
-      const relations = await resolveContentRelations(content.metadata)
+      const relations = await resolveContentRelations(content)
       res.status(200).json({ content, relations })
     } catch (error) {
       next(error)
@@ -89,11 +89,12 @@ router.post("/", async (req: Request, res: Response, next: NextFunction) => {
   try {
     const actor = getRequestActor(res)
     const input = parseContentInput(req.body, false)
+    await prepareContentReferences(input, actor.id)
     const content = await ContentModel.create({
       ...input,
       createdBy: actor.id,
     })
-    await linkContentMedia(content._id, input.metadata, actor.id)
+    await linkContentMedia(content._id, input.mediaIds)
 
     res.status(201).json({ content: content.toObject() })
   } catch (error) {
@@ -106,7 +107,17 @@ router.patch(
   async (req: Request<{ id: string }>, res: Response, next: NextFunction) => {
     try {
       const actor = getRequestActor(res)
+      if (
+        !(await ContentModel.exists({
+          _id: req.params.id,
+          deletedAt: { $exists: false },
+        }))
+      ) {
+        res.status(404).json({ error: "Content not found" })
+        return
+      }
       const input = parseContentInput(req.body, true)
+      await prepareContentReferences(input, actor.id)
       const content = await ContentModel.findOneAndUpdate(
         { _id: req.params.id, deletedAt: { $exists: false } },
         { $set: input },
@@ -118,7 +129,7 @@ router.patch(
         return
       }
 
-      await linkContentMedia(content._id, input.metadata, actor.id)
+      await linkContentMedia(content._id, input.mediaIds)
 
       res.status(200).json({ content })
     } catch (error) {
@@ -149,28 +160,19 @@ function parseContentInput(value: unknown, partial: boolean) {
     "visibility",
     partial
   )
-  const moderationStatus = requiredOrOptionalEnum(
-    value.moderationStatus,
-    CONTENT_MODERATION_STATUSES,
-    "moderationStatus",
-    partial
-  )
 
   if (kind !== undefined) result.kind = kind
   if (status !== undefined) result.status = status
   if (visibility !== undefined) result.visibility = visibility
-  if (moderationStatus !== undefined) result.moderationStatus = moderationStatus
 
   assignOptionalString(result, value, "title", 1_000)
   assignOptionalString(result, value, "slug", 300)
   if (typeof result.slug === "string")
     result.slug = normalizeSlug(result.slug) || undefined
   assignOptionalString(result, value, "description", 20_000)
-  assignOptionalString(result, value, "studioId", 200)
+  assignStringArray(result, value, "channelIds")
+  assignStringArray(result, value, "mediaIds")
   assignStringArray(result, value, "termIds")
-  assignStringArray(result, value, "actorIds")
-  assignOptionalDate(result, value, "publishedAt")
-  assignOptionalDate(result, value, "scheduledAt")
 
   if ("metadata" in value) {
     if (value.metadata !== null && !isRecord(value.metadata)) {
@@ -196,126 +198,13 @@ function parseContentInput(value: unknown, partial: boolean) {
   return result
 }
 
-async function resolveContentRelations(metadataValue: unknown) {
-  const metadata = toPlainRecord(metadataValue)
-  const channelIds = uniqueStrings([
-    metadata.studioId,
-    ...(Array.isArray(metadata.actorIds) ? metadata.actorIds : []),
-  ])
-  const termIds = uniqueStrings([
-    ...(Array.isArray(metadata.categoryIds) ? metadata.categoryIds : []),
-    ...(Array.isArray(metadata.tagIds) ? metadata.tagIds : []),
-  ])
-  const contentIds = uniqueStrings([metadata.sourceVideoId])
-
-  const [databaseChannels, terms, contents] = await Promise.all([
-    channelIds.length
-      ? ChannelModel.find({
-          _id: { $in: channelIds },
-          status: { $ne: "deleted" },
-        }).lean()
-      : [],
-    termIds.length
-      ? TermModel.find({ _id: { $in: termIds }, status: "active" }).lean()
-      : [],
-    contentIds.length
-      ? ContentModel.find({
-          _id: { $in: contentIds },
-          kind: "video",
-          deletedAt: { $exists: false },
-        })
-          .select({ _id: 1, title: 1, slug: 1, kind: 1 })
-          .lean()
-      : [],
-  ])
-  const mockChannelById = new Map(
-    mockChannels.map((channel) => [channel.id, channel])
-  )
-  const databaseChannelById = new Map(
-    databaseChannels.map((channel) => [channel._id, channel])
-  )
-
-  return {
-    channels: channelIds.flatMap((id) => {
-      const databaseChannel = databaseChannelById.get(id)
-      if (databaseChannel)
-        return [
-          {
-            id: databaseChannel._id,
-            name: databaseChannel.name,
-            handle: databaseChannel.handle,
-            avatarUrl: databaseChannel.avatarUrl ?? null,
-            kind: databaseChannel.kind,
-          },
-        ]
-      const mockChannel = mockChannelById.get(id)
-      return mockChannel ? [mockChannel] : []
-    }),
-    terms: terms.map((term) => ({
-      id: term._id,
-      name: term.name,
-      slug: term.slug,
-      taxonomy: term.taxonomy,
-    })),
-    contents: contents.map((content) => ({
-      id: content._id,
-      title: content.title ?? content.slug ?? content._id,
-      slug: content.slug ?? content._id,
-      kind: content.kind,
-    })),
-  }
-}
-
-function toPlainRecord(value: unknown): Record<string, unknown> {
-  if (value instanceof Map) return Object.fromEntries(value)
-  return isRecord(value) ? value : {}
-}
-
-function uniqueStrings(values: unknown[]) {
-  return [
-    ...new Set(
-      values.filter(
-        (value): value is string =>
-          typeof value === "string" && Boolean(value.trim())
-      )
-    ),
-  ]
-}
-
-async function linkContentMedia(
-  contentId: string,
-  metadata: unknown,
-  createdBy: string
-) {
-  const values = collectStringValues(metadata)
-  if (!values.length) return
+async function linkContentMedia(contentId: string, value: unknown) {
+  if (!Array.isArray(value) || !value.length) return
+  // Do not steal media already associated with another content.
   await MediaModel.updateMany(
-    {
-      url: { $in: values },
-      createdBy,
-      status: { $in: ["ready", "processing"] },
-      deletedAt: null,
-    },
+    { _id: { $in: value }, contentId: null, deletedAt: null },
     { $set: { contentId } }
   )
-}
-
-function collectStringValues(value: unknown) {
-  const values = new Set<string>()
-  visit(value)
-  return [...values]
-
-  function visit(current: unknown): void {
-    if (typeof current === "string") {
-      if (current.trim()) values.add(current.trim())
-      return
-    }
-    if (Array.isArray(current)) {
-      current.forEach(visit)
-      return
-    }
-    if (isRecord(current)) Object.values(current).forEach(visit)
-  }
 }
 
 function requiredOrOptionalEnum<const T extends readonly string[]>(
@@ -376,23 +265,6 @@ function assignStringArray(
     throw badRequest(`${field} must be an array of strings`)
   }
   target[field] = [...new Set(value.map((item) => item.trim()).filter(Boolean))]
-}
-
-function assignOptionalDate(
-  target: Record<string, unknown>,
-  source: Record<string, unknown>,
-  field: string
-) {
-  if (!(field in source)) return
-  const value = source[field]
-  if (value === null || value === "") {
-    target[field] = undefined
-    return
-  }
-  if (typeof value !== "string" || Number.isNaN(Date.parse(value))) {
-    throw badRequest(`${field} must be an ISO date string`)
-  }
-  target[field] = new Date(value)
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {

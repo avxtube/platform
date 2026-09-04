@@ -28,7 +28,7 @@ function getInitials(name: string) {
 function formatDuration(totalSeconds: number) {
   const hours = Math.floor(totalSeconds / 3600)
   const minutes = Math.floor((totalSeconds % 3600) / 60)
-  const seconds = totalSeconds % 60
+  const seconds = Math.floor(totalSeconds % 60)
   return hours > 0
     ? `${hours}:${String(minutes).padStart(2, "0")}:${String(seconds).padStart(2, "0")}`
     : `${minutes}:${String(seconds).padStart(2, "0")}`
@@ -78,10 +78,10 @@ export function VideoCard({
     >
       <Link href={href} aria-label={video.title} className="block">
         <div className="relative aspect-video overflow-hidden rounded-xl bg-muted">
-          {/* Mock API thumbnails are remote URLs, so the native element avoids coupling API data to next/image domains. */}
+          {/* Media can come from configured storage or a remote provider. */}
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img
-            src={video.thumbnailUrl}
+            src={video.thumbnailUrl || undefined}
             alt=""
             loading="lazy"
             className={`size-full object-cover transition-[transform,opacity] duration-300 group-hover:scale-[1.02] ${previewPlaying ? "opacity-0" : "opacity-100"}`}
@@ -126,7 +126,10 @@ export function VideoCard({
             href={`/channel/${video.channel.handle.replace(/^@/, "")}`}
             className="flex size-9 shrink-0 items-center justify-center rounded-full bg-foreground text-[11px] font-bold text-background"
           >
-            {getInitials(video.channel.name)}
+            {video.channel.avatarUrl ? (
+              // eslint-disable-next-line @next/next/no-img-element
+              <img src={video.channel.avatarUrl} alt="" loading="lazy" className="size-full rounded-full object-cover" />
+            ) : getInitials(video.channel.name)}
           </Link>
         ) : null}
         <div className="min-w-0 flex-1">

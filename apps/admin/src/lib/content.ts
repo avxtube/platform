@@ -4,13 +4,21 @@ export type ContentKind = (typeof contentKinds)[number]
 export type AdminContent = {
   _id: string
   kind: ContentKind
-  status: "draft" | "processing" | "scheduled" | "published" | "ended" | "failed"
+  status:
+    | "draft"
+    | "processing"
+    | "scheduled"
+    | "published"
+    | "ended"
+    | "failed"
   visibility: "public" | "unlisted" | "private"
   moderationStatus: "active" | "suspended"
   title?: string
   slug?: string
   description?: string
   studioId?: string
+  channelIds?: string[]
+  mediaIds?: string[]
   termIds?: string[]
   actorIds?: string[]
   metadata?: Record<string, unknown>
@@ -27,11 +35,8 @@ export type AdminContent = {
   createdBy: string
 }
 
-export type ContentRelations = {
-  channels: Array<{ id: string; name: string; handle: string; avatarUrl: string | null; kind: "actor" | "studio" }>
-  terms: Array<{ id: string; name: string; slug: string; taxonomy: "category" | "tag" }>
-  contents: Array<{ id: string; title: string; slug: string; kind: "video" }>
-}
+import type { ContentRelations } from "@workspace/core/types/content"
+export type { ContentRelations } from "@workspace/core/types/content"
 
 export type ContentListResponse = {
   items: AdminContent[]

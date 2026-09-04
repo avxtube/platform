@@ -13,6 +13,7 @@ import {
   Plus,
   Radio,
   Sun,
+  Settings,
   Video,
 } from "lucide-react"
 import { useLocale, useTranslations } from "next-intl"
@@ -220,6 +221,16 @@ function AdminSidebar({ user }: { user: AdminUser }) {
                 >
                   <HardDrive />
                   <span>{t("storage.title")}</span>
+                </SidebarMenuButton>
+              </SidebarMenuItem>
+              <SidebarMenuItem>
+                <SidebarMenuButton
+                  isActive={pathname.startsWith("/setting")}
+                  tooltip={t("settings.title")}
+                  render={<Link href="/setting" onClick={closeMobileSidebar} />}
+                >
+                  <Settings />
+                  <span>{t("settings.title")}</span>
                 </SidebarMenuButton>
               </SidebarMenuItem>
             </SidebarMenu>

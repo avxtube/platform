@@ -132,10 +132,8 @@ export const DEFAULT_GENERAL_SETTING = {
 
 // ── Domain — โดเมนย่อยสำหรับ embed/สตรีม (ชื่อเดียวกับระบบเก่า) ──
 export const DEFAULT_DOMAIN_SETTING = {
-    "domain_sub": [] as string[],
     "domain_content": "",
     "domain_static": "",
-    "domain_preview": "",
     "domain_playlist": "",
     "url_scraping": "",
 }

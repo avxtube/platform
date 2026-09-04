@@ -1,24 +1,47 @@
-import { Router, type Request, type Response } from "express";
-import { mockActors } from "../data/mock-actors";
-import { mockVideos } from "../data/mock-videos";
+import { Router } from "express"
+import { ChannelModel } from "@workspace/db/models"
+import {
+  getPublicChannels,
+  mapActor,
+  publicChannelFilter,
+} from "../services/channel-viewer.service"
+import {
+  getPublicContents,
+  getContentMappers,
+  publicVideoFilter,
+} from "../services/content-video.service"
 
-const router: Router = Router();
-
-router.get("/", (_req: Request, res: Response) => {
-  res.status(200).json({ actors: mockActors, total: mockActors.length });
-});
-
-router.get("/:handle", (req: Request<{ handle: string }>, res: Response) => {
-  const normalized = req.params.handle.replace(/^@/, "").toLowerCase();
-  const actor = mockActors.find((item) => item.handle.replace(/^@/, "").toLowerCase() === normalized);
-  if (!actor) {
-    res.status(404).json({ error: "Actor not found" });
-    return;
+const router: Router = Router()
+const actorFilter = (): Record<string, unknown> => ({
+  ...publicChannelFilter(),
+  kind: "person",
+  "metadata.roles": "actor",
+})
+router.get("/", async (_req, res) => {
+  const [rows, total] = await Promise.all([
+    getPublicChannels(actorFilter(), 100),
+    ChannelModel.countDocuments(actorFilter()),
+  ])
+  res.json({ actors: rows.map(mapActor), total })
+})
+router.get("/:handle", async (req, res) => {
+  const [row] = await getPublicChannels(
+    {
+      ...actorFilter(),
+      handle: req.params.handle.replace(/^@/, "").toLowerCase(),
+    },
+    1
+  )
+  if (!row) {
+    res.status(404).json({ error: "Actor not found" })
+    return
   }
-  res.status(200).json({
-    actor,
-    videos: mockVideos.filter((video) => video.channel.id === actor.id),
-  });
-});
-
-export default router;
+  const actor = mapActor(row)
+  const contents = await getPublicContents(
+    { ...publicVideoFilter(), channelIds: actor.id },
+    48
+  )
+  const { mapVideo } = await getContentMappers()
+  res.json({ actor, videos: contents.map(mapVideo) })
+})
+export default router

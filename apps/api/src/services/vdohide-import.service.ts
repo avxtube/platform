@@ -50,14 +50,13 @@ export async function importVideoToVdoHide({
   }
 
   const id = randomUUID()
-  const mediaRecord = await MediaModel.create({
+  const mediaRecord = new MediaModel({
     _id: id,
     kind: "video",
     purpose,
-    provider: "vdohide",
-    status: "processing",
-    sourceUrl,
-    createdBy,
+    provider: "remote",
+    quality: "original",
+    metadata: { sourceProvider: "vdohide", sourcePageUrl: sourceUrl },
   })
 
   try {
@@ -99,15 +98,9 @@ export async function importVideoToVdoHide({
         : sourceUrl
     const key = `vdohide/${externalSlug ?? externalId}`
 
-    mediaRecord.externalId = externalId
-    mediaRecord.externalSlug = externalSlug
-    mediaRecord.url = url
-    mediaRecord.key = key
-    mediaRecord.mimeType = "application/vnd.apple.mpegurl"
-    mediaRecord.metadata = new Map<string, unknown>([
-      ["name", body.data.name],
-      ["cloned", Boolean(body.cloned)],
-    ])
+    mediaRecord.set("metadata.directUrl", url)
+    mediaRecord.set("metadata.title", body.data.name)
+    mediaRecord.error = undefined
     await mediaRecord.save()
 
     return {
@@ -123,7 +116,6 @@ export async function importVideoToVdoHide({
       size: 0,
     }
   } catch (error) {
-    mediaRecord.status = "failed"
     mediaRecord.error =
       error instanceof Error ? error.message : "VdoHide import failed"
     await mediaRecord.save().catch(() => undefined)

@@ -27,6 +27,7 @@ import {
 } from "../middlewares/user-access.middleware"
 import { storeMediaFile } from "../services/media-storage.service"
 import { importVideoToVdoHide } from "../services/vdohide-import.service"
+import { registerMissavMedia } from "../services/remote-media-import.service"
 
 const uploadDirectory = path.join(tmpdir(), "avxtube-media")
 mkdirSync(uploadDirectory, { recursive: true })
@@ -36,6 +37,21 @@ const upload = multer({
 })
 const router: Router = Router()
 router.use(authenticateUser, requireAdmin)
+
+router.post(
+  "/register-missav",
+  async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const mediaIds = await registerMissavMedia(
+        req.body,
+        getRequestActor(res).id
+      )
+      res.status(201).json({ mediaIds })
+    } catch (error) {
+      next(error)
+    }
+  }
+)
 
 router.post(
   "/upload",

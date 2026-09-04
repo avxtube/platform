@@ -1,11 +1,9 @@
-import { ContentModel } from "@workspace/db/models"
 import { Router, type NextFunction, type Request, type Response } from "express"
 
-import { mockPlaylists } from "../data/mock-playlists"
-import { mockShorts } from "../data/mock-shorts"
 import {
   getPublicVideoCategories,
-  mapContentsToVideos,
+  getPublicContents,
+  getContentMappers,
   publicVideoFilter,
   resolveCategoryId,
 } from "../services/content-video.service"
@@ -27,20 +25,23 @@ router.get("/", async (req: Request, res: Response, next: NextFunction) => {
     }
 
     const filter: Record<string, unknown> = publicVideoFilter()
-    if (categoryId) filter["metadata.categoryIds"] = categoryId
-    const contents = await ContentModel.find(filter)
-      .sort({ publishedAt: -1, createdAt: -1 })
-      .limit(requestedCategory === "all" ? 24 : 48)
-      .lean()
-    const videos = await mapContentsToVideos(
-      contents as unknown as Array<Record<string, unknown>>
+    if (categoryId) filter.termIds = categoryId
+    const [contents, shortContents, { mapVideo, mapShort }] = await Promise.all(
+      [
+        getPublicContents(filter, requestedCategory === "all" ? 24 : 48),
+        requestedCategory === "all"
+          ? getPublicContents(publicVideoFilter("short"), 10)
+          : [],
+        getContentMappers(),
+      ]
     )
+    const videos = contents.map(mapVideo)
 
     res.status(200).json({
       categories,
       videos,
-      shorts: requestedCategory === "all" ? mockShorts.slice(0, 10) : [],
-      playlists: requestedCategory === "all" ? mockPlaylists : [],
+      shorts: shortContents.map(mapShort),
+      playlists: [],
     })
   } catch (error) {
     next(error)

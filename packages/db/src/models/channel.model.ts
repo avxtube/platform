@@ -1,8 +1,19 @@
 import mongoose, { type InferSchemaType, type Model } from "mongoose";
 
-import { CHANNEL_KINDS } from "@workspace/core/types";
+import { CHANNEL_KINDS, CHANNEL_GENDERS, CHANNEL_ROLES } from "@workspace/core/types/channel";
 
 const { Schema, model, models } = mongoose;
+
+export { CHANNEL_GENDERS } from "@workspace/core/types/channel";
+
+const channelMetadataSchema = new Schema(
+  {
+    // Optional personal information; leave absent when unknown or not applicable.
+    gender: { type: String, enum: CHANNEL_GENDERS },
+    roles: { type: [{ type: String, enum: CHANNEL_ROLES }], default: undefined },
+  },
+  { _id: false, strict: false },
+);
 
 const channelStatsSchema = new Schema(
   {
@@ -25,8 +36,7 @@ const channelLinkSchema = new Schema(
 const channelSchema = new Schema(
   {
     _id: { type: String, required: true },
-    ownerId: { type: String, ref: "User", required: true },
-    kind: { type: String, enum: CHANNEL_KINDS, required: true, default: "creator" },
+    kind: { type: String, enum: CHANNEL_KINDS, required: true, default: "page" },
     layout: { type: String, enum: ["banner", "compact"], default: "banner" },
     enabledTabs: {
       type: [String],
@@ -50,6 +60,7 @@ const channelSchema = new Schema(
     status: { type: String, enum: ["active", "suspended", "deleted"], default: "active" },
     verifiedAt: { type: Date, default: null },
     stats: { type: channelStatsSchema, default: () => ({}) },
+    metadata: { type: channelMetadataSchema },
     deletedAt: { type: Date, default: null },
   },
   { timestamps: true, versionKey: false, collection: "channels" },
@@ -57,7 +68,7 @@ const channelSchema = new Schema(
 
 channelSchema.index({ handle: 1 }, { unique: true });
 channelSchema.index({ kind: 1, status: 1, createdAt: -1 });
-channelSchema.index({ ownerId: 1, status: 1 });
+channelSchema.index({ kind: 1, "metadata.roles": 1, status: 1 });
 channelSchema.index({ name: "text", handle: "text", keywords: "text" });
 
 export type ChannelSchemaType = InferSchemaType<typeof channelSchema>;

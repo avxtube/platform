@@ -4,8 +4,10 @@ import { Router, type NextFunction, type Request, type Response } from "express"
 import { mockComments } from "../data/mock-comments"
 import {
   findPublicVideo,
-  mapContentsToVideos,
+  getPublicContents,
+  getContentMappers,
   publicVideoFilter,
+  stringValue,
 } from "../services/content-video.service"
 
 const router: Router = Router()
@@ -19,16 +21,15 @@ router.get("/", async (req: Request, res: Response, next: NextFunction) => {
     const limit = paginated ? boundedLimit(req.query.limit, 4) : 100
     const sort: Record<string, 1 | -1> =
       req.query.sort === "trending"
-        ? { "stats.viewCount": -1 as const, publishedAt: -1 as const }
-        : { publishedAt: -1 as const, createdAt: -1 as const }
+        ? { "stats.viewCount": -1, createdAt: -1, _id: -1 }
+        : { createdAt: -1, _id: -1 }
     const filter = publicVideoFilter()
-    const [contents, total] = await Promise.all([
-      ContentModel.find(filter).sort(sort).skip(cursor).limit(limit).lean(),
+    const [contents, total, { mapVideo }] = await Promise.all([
+      getPublicContents(filter, limit, cursor, sort),
       ContentModel.countDocuments(filter),
+      getContentMappers(),
     ])
-    const videos = await mapContentsToVideos(
-      contents as unknown as Array<Record<string, unknown>>
-    )
+    const videos = contents.map(mapVideo)
 
     if (!paginated) {
       res.status(200).json({ videos, total })
@@ -56,18 +57,16 @@ router.get(
       }
       const cursor = nonNegativeInteger(req.query.cursor, 0)
       const limit = boundedLimit(req.query.limit, 4)
-      const filter = { ...publicVideoFilter(), _id: { $ne: video._id } }
-      const [contents, total] = await Promise.all([
-        ContentModel.find(filter)
-          .sort({ publishedAt: -1, createdAt: -1 })
-          .skip(cursor)
-          .limit(limit)
-          .lean(),
+      const filter = {
+        ...publicVideoFilter(),
+        _id: { $ne: stringValue(video._id) },
+      }
+      const [contents, total, { mapVideo }] = await Promise.all([
+        getPublicContents(filter, limit, cursor),
         ContentModel.countDocuments(filter),
+        getContentMappers(),
       ])
-      const items = await mapContentsToVideos(
-        contents as unknown as Array<Record<string, unknown>>
-      )
+      const items = contents.map(mapVideo)
       const nextOffset = cursor + items.length
       res.status(200).json({
         items,
@@ -107,19 +106,16 @@ router.get(
         res.status(404).json({ error: "Video not found" })
         return
       }
-      const relatedContents = await ContentModel.find({
-        ...publicVideoFilter(),
-        _id: { $ne: content._id },
-      })
-        .sort({ publishedAt: -1, createdAt: -1 })
-        .limit(4)
-        .lean()
-      const [video] = await mapContentsToVideos([
-        content as unknown as Record<string, unknown>,
-      ])
-      const relatedVideos = await mapContentsToVideos(
-        relatedContents as unknown as Array<Record<string, unknown>>
+      const relatedContents = await getPublicContents(
+        {
+          ...publicVideoFilter(),
+          _id: { $ne: content._id },
+        },
+        5
       )
+      const { mapVideo } = await getContentMappers()
+      const video = mapVideo(content)
+      const relatedVideos = relatedContents.slice(0, 4).map(mapVideo)
       if (!video) {
         res.status(404).json({ error: "Video not found" })
         return
@@ -127,7 +123,7 @@ router.get(
       res.status(200).json({
         video,
         relatedVideos,
-        relatedNextCursor: relatedVideos.length === 4 ? "4" : null,
+        relatedNextCursor: relatedContents.length > 4 ? "4" : null,
         comments: mockComments.slice(0, 4),
         commentsNextCursor: mockComments.length > 4 ? "4" : null,
       })

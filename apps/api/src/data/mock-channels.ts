@@ -1,10 +1,10 @@
-import type { Channel, ChannelKind, ChannelTabId } from "@workspace/core/types";
+import type { Channel, ChannelTabId } from "@workspace/core/types";
 
 import { mockActors } from "./mock-actors";
 import { mockShorts } from "./mock-shorts";
 import { mockVideos } from "./mock-videos";
 
-const kindById: Record<string, ChannelKind> = {
+const kindById: Record<string, "actor" | "studio" | "creator"> = {
   "urban-lens": "actor",
   "taste-trails": "actor",
   "dev-studio": "studio",
@@ -37,7 +37,7 @@ const channelVariants: Record<string, {
 export const mockChannels: Channel[] = mockActors.map((actor, index) => {
   const kind = kindById[actor.id] ?? "creator";
   const videos = mockVideos.filter((video) => video.channel.id === actor.id);
-  const shorts = mockShorts.filter((short) => short.channel.id === actor.id);
+  const shorts = mockShorts.filter((short) => short.channel?.id === actor.id);
   const topics = [...new Set(videos.map((video) => video.category))];
   const variant = channelVariants[actor.id] ?? {
     layout: "banner" as const,
@@ -48,7 +48,7 @@ export const mockChannels: Channel[] = mockActors.map((actor, index) => {
 
   return {
     id: actor.id,
-    kind,
+    kind: kind === "studio" ? "organization" : "person",
     layout: variant.layout,
     enabledTabs: variant.tabs,
     defaultTab: variant.defaultTab,
@@ -67,10 +67,10 @@ export const mockChannels: Channel[] = mockActors.map((actor, index) => {
     joinedAt: new Date(Date.UTC(2022 + (index % 3), index % 12, 4 + index)).toISOString(),
     isFollowing: actor.isFollowing,
     links: [{ label: actor.name, url: `https://avxtube.org/channel/${actor.handle.replace(/^@/, "")}` }],
-    profile: kind === "actor"
-      ? { kind, stageName: actor.name, nationality: index % 2 === 0 ? "Thai" : null, genres: topics }
+    metadata: kind === "actor"
+      ? { roles: [kind], stageName: actor.name, nationality: index % 2 === 0 ? "Thai" : null, genres: topics }
       : kind === "studio"
-        ? { kind, legalName: `${actor.name} Co., Ltd.`, foundedYear: 2018 + (index % 6), specialties: topics }
-        : { kind, topics },
+        ? { roles: [kind], legalName: `${actor.name} Co., Ltd.`, foundedYear: 2018 + (index % 6), specialties: topics }
+        : { roles: [kind], topics },
   };
 });

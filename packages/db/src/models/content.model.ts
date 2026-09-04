@@ -1,19 +1,10 @@
 import mongoose, { type InferSchemaType, type Model } from "mongoose";
 import { v4 as uuidv4 } from "uuid";
+import { CONTENT_KINDS, CONTENT_STATUSES, CONTENT_VISIBILITIES } from "@workspace/core/types/content";
 
 const { Schema, model, models } = mongoose;
 
-export const CONTENT_KINDS = ["video", "short", "post", "live"] as const;
-export const CONTENT_STATUSES = [
-    "draft",
-    "processing",
-    "scheduled",
-    "published",
-    "ended",
-    "failed",
-] as const;
-export const CONTENT_VISIBILITIES = ["public", "unlisted", "private"] as const;
-export const CONTENT_MODERATION_STATUSES = ["active", "suspended"] as const;
+export { CONTENT_KINDS, CONTENT_STATUSES, CONTENT_VISIBILITIES } from "@workspace/core/types/content";
 
 const contentStatsSchema = new Schema(
     {
@@ -41,7 +32,6 @@ const contentSeoSchema = new Schema(
 const contentSchema = new Schema(
     {
         _id: { type: String, required: true, default: uuidv4 },
-        studioId: { type: String, ref: "Channel" },
         kind: { type: String, required: true, enum: CONTENT_KINDS, default: "video" },
         status: { type: String, required: true, enum: CONTENT_STATUSES, default: "draft" },
         visibility: {
@@ -50,28 +40,25 @@ const contentSchema = new Schema(
             enum: CONTENT_VISIBILITIES,
             default: "private",
         },
-        moderationStatus: {
-            type: String,
-            required: true,
-            enum: CONTENT_MODERATION_STATUSES,
-            default: "active",
-        },
         title: { type: String, trim: true, maxlength: 1_000 },
         slug: { type: String, trim: true, lowercase: true, maxlength: 300 },
         description: { type: String, maxlength: 20_000 },
+        channelIds: {
+            type: [{ type: String, ref: "Channel" }],
+            default: undefined,
+        },
         termIds: {
             type: [{ type: String, ref: "Term" }],
             default: undefined,
         },
-        actorIds: {
-            type: [{ type: String, ref: "Channel" }],
+        // Media owns its URL, purpose and quality; content only stores references.
+        mediaIds: {
+            type: [{ type: String, ref: "Media" }],
             default: undefined,
         },
         stats: { type: contentStatsSchema, default: () => ({}) },
         seo: { type: contentSeoSchema },
         metadata: { type: Map, of: Schema.Types.Mixed },
-        publishedAt: { type: Date },
-        scheduledAt: { type: Date },
         deletedAt: { type: Date },
         createdBy: { type: String, ref: "User", required: true },
     },
@@ -82,11 +69,12 @@ const contentSchema = new Schema(
     },
 );
 
-contentSchema.index({ studioId: 1, kind: 1, status: 1, publishedAt: -1 });
-contentSchema.index({ visibility: 1, status: 1, publishedAt: -1 });
-contentSchema.index({ kind: 1, moderationStatus: 1, publishedAt: -1 });
-contentSchema.index({ actorIds: 1, status: 1, publishedAt: -1 });
-contentSchema.index({ "metadata.sourceVideoId": 1, kind: 1 });
+contentSchema.index({ channelIds: 1, kind: 1, status: 1 });
+contentSchema.index({ visibility: 1, status: 1 });
+// Public feeds page before joining channel/media/term references.
+contentSchema.index({ kind: 1, status: 1, visibility: 1, deletedAt: 1, createdAt: -1, _id: -1 });
+contentSchema.index({ kind: 1, status: 1, visibility: 1, deletedAt: 1, "stats.viewCount": -1, createdAt: -1, _id: -1 });
+contentSchema.index({ termIds: 1, kind: 1, status: 1, visibility: 1, deletedAt: 1, createdAt: -1, _id: -1 });
 contentSchema.index({ kind: 1, slug: 1 }, { unique: true, partialFilterExpression: { slug: { $type: "string" } } });
 
 export type ContentSchemaType = InferSchemaType<typeof contentSchema>;

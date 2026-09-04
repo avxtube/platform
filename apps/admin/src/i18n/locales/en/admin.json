@@ -25,7 +25,8 @@
   "importAction": "Import",
   "importSuccess": "The data was imported and normalized successfully.",
   "quickImportTitle": "Quick video import",
-  "quickImportDescription": "After the data is retrieved, media is verified and the video is saved immediately as a draft.",
+  "quickImportDescription": "Imported data is saved immediately as a draft. MissAV stores source URLs and descriptors for proxy testing without uploads; other sources keep the existing import flow.",
+  "missavProxyImportNotice": "MissAV: saving registers source URLs and media descriptors for proxy testing without downloads or uploads. Previews may remain unavailable until a proxy is implemented.",
   "quickImportSuccess": "The video was imported and saved as a draft.",
   "importFailed": "Unable to import data.",
   "editor": {
@@ -66,7 +67,11 @@
   "publishing": "Publishing",
   "seo": "SEO",
   "metadata": "Custom metadata",
-  "metadataHelp": "Valid JSON. Add studioId, actorIds, categoryIds, tagIds, dvdId, label or type-specific data here.",
+  "metadataHelp": "Valid JSON. Add dvdId, label or other custom data. Channels, terms and media use their dedicated fields.",
+  "contentStudio": "Studio",
+  "contentActors": "Actors",
+  "videoRenditions": "Saved video renditions",
+  "videoRenditionsHelp": "One media record per quality. Replacing or clearing the video source replaces this set when saved; other edits preserve it.",
   "metadataInvalid": "Metadata must be a valid JSON object.",
   "metadataRequired": "{field} is required.",
   "metadataListHelp": "Enter one value per line or separate values with commas.",
@@ -219,5 +224,48 @@
   "moderation": {
     "active": "Active",
     "suspended": "Suspended"
+  },
+  "settings": {
+    "title": "Settings",
+    "description": "Manage platform settings by group.",
+    "configure": "Configure",
+    "back": "Settings",
+    "save": "Save settings",
+    "saving": "Saving…",
+    "saved": "Domain settings saved.",
+    "saveFailed": "Unable to save settings. Please try again.",
+    "reset": "Discard changes",
+    "unsaved": "You have unsaved changes.",
+    "noChanges": "No unsaved changes.",
+    "invalidForm": "Please check the highlighted fields.",
+    "invalidOrigin": "Enter a domain such as cdn.example.com (optional port), without a path, query or credentials, or leave it blank.",
+    "invalidEndpoint": "Enter an HTTP(S) endpoint without credentials, query or fragment, or leave it blank.",
+    "accessDenied": "Your session expired or you do not have permission. Please sign in again.",
+    "domain": {
+      "title": "Domains",
+      "description": "Configure domains for video, m3u8, static media and internal services.",
+      "notice": "Import reads Scraping from these saved settings on every request; SCRAPER_API is no longer used. Media domains remain configuration for later media/proxy integration. DNS, authentication and existing media URLs are unchanged.",
+      "roles": "Domain assignments",
+      "rolesHelp": "Enter domains only, without http:// or https://. Leave blank if not configured. Ports are allowed for local development.",
+      "scraping": "Scraping service"
+    },
+    "fields": {
+      "domain_content": {
+        "label": "Content Domain",
+        "help": "Domain intended for serving video files."
+      },
+      "domain_static": {
+        "label": "Static Domain",
+        "help": "Domain for images, trailers, galleries and subtitles."
+      },
+      "domain_playlist": {
+        "label": "Playlist Domain",
+        "help": "Domain for requesting m3u8 playlists."
+      },
+      "url_scraping": {
+        "label": "Scraping URL",
+        "help": "Service base URL, e.g. http://localhost:8081, without a trailing slash. Import appends /scraper automatically. Never include passwords or API keys."
+      }
+    }
   }
 }

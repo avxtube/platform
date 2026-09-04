@@ -1,57 +1,228 @@
 /* eslint-disable @next/next/no-img-element */
 "use client"
 
-import * as React from "react"
 import type { Video } from "@workspace/core/types"
-import { Captions, Maximize, Minimize, Pause, PictureInPicture2, Play, Settings, Volume2, VolumeX } from "lucide-react"
-import { useTranslations } from "next-intl"
+import * as React from "react"
 
 import { useWatchPlayer } from "./watch-player-provider"
 
-function clock(seconds: number) {
-  const minutes = Math.floor(seconds / 60)
-  return `${minutes}:${String(Math.floor(seconds % 60)).padStart(2, "0")}`
+const playerStylesheet = publicHttpUrl(
+  process.env.NEXT_PUBLIC_PLAYER_STYLESHEET_URL,
+  "https://asset-cdn.vdohide.com/player.bundle.min.css"
+)
+const playerScript = publicHttpUrl(
+  process.env.NEXT_PUBLIC_PLAYER_SCRIPT_URL,
+  process.env.NODE_ENV === "development"
+    ? "https://asset-cdn.vdohide.com/player.min.js"
+    : "https://asset-cdn.vdohide.com/player.min.js"
+)
+const jwPlayerScript = "https://ssl.p.jwpcdn.com/player/v/8.49.10/jwplayer.js"
+
+type ExternalPlayerConfig = {
+  dev: boolean
+  vdoId: string
+  node: { static: string; playlist: string }
+  autostart: boolean
+  mute: boolean
+  pipIcon: "enabled"
+  baseColor: string
+  bgColor: string
+  cast: boolean
+  loop: boolean
+  seek: {
+    seconds: number
+    indicator: boolean
+    forward: boolean
+    backward: boolean
+  }
+  playbackRate: boolean
+  continuePlayBack: {
+    enable: boolean
+    ark: boolean
+    autoResume: boolean
+    countdown: number
+  }
+  sprite: boolean
+  image: boolean
 }
 
-export function WatchPlayer({ video, theater, onTheater, playlist }: { video: Video; theater: boolean; onTheater: () => void; playlist?: { id: string; index: number } | null }) {
-  const t = useTranslations("video")
+declare global {
+  interface Window {
+    PLAYER_CONFIG?: ExternalPlayerConfig
+    jwplayer?: unknown
+  }
+}
+
+function publicHttpUrl(value: string | undefined, fallback: string) {
+  try {
+    const url = new URL(value || fallback)
+    return url.protocol === "http:" || url.protocol === "https:"
+      ? url.href
+      : fallback
+  } catch {
+    return fallback
+  }
+}
+
+function createPlayerConfig(video: Video): ExternalPlayerConfig | null {
+  if (!video.player) return null
+  return {
+    dev: process.env.NODE_ENV === "development",
+    vdoId: video.player.vdoId,
+    node: video.player.node,
+    autostart: false,
+    mute: false,
+    pipIcon: "enabled",
+    baseColor: "#f90101",
+    bgColor: "#000000",
+    cast: true,
+    loop: true,
+    seek: {
+      seconds: 30,
+      indicator: true,
+      forward: true,
+      backward: true,
+    },
+    playbackRate: true,
+    continuePlayBack: {
+      enable: true,
+      ark: false,
+      autoResume: false,
+      countdown: 20,
+    },
+    sprite: true,
+    image: true,
+  }
+}
+
+export function WatchPlayer({
+  video,
+  playlist,
+}: {
+  video: Video
+  theater: boolean
+  onTheater: () => void
+  playlist?: { id: string; index: number } | null
+}) {
   const rootRef = React.useRef<HTMLDivElement>(null)
-  const player = useWatchPlayer()
-  const [fullscreen, setFullscreen] = React.useState(false)
-  const [settingsOpen, setSettingsOpen] = React.useState(false)
-  const [quality, setQuality] = React.useState("1080p")
-  const [captions, setCaptions] = React.useState(false)
+  const watchPlayer = useWatchPlayer()
+  const [loadState, setLoadState] = React.useState<
+    "loading" | "ready" | "error"
+  >("loading")
   const playlistId = playlist?.id
   const playlistIndex = playlist?.index
+  const activate = watchPlayer.activate
 
-  const activate = player.activate
-  React.useEffect(() => activate(video, playlistId && playlistIndex ? { id: playlistId, index: playlistIndex } : null), [activate, playlistId, playlistIndex, video])
+  React.useEffect(
+    () =>
+      activate(
+        video,
+        playlistId && playlistIndex
+          ? { id: playlistId, index: playlistIndex }
+          : null
+      ),
+    [activate, playlistId, playlistIndex, video]
+  )
+
   React.useEffect(() => {
-    function onFullscreenChange() { setFullscreen(Boolean(document.fullscreenElement)) }
-    document.addEventListener("fullscreenchange", onFullscreenChange)
-    return () => document.removeEventListener("fullscreenchange", onFullscreenChange)
-  }, [])
-  React.useEffect(() => {
-    function onKeyDown(event: KeyboardEvent) {
-      if (event.target instanceof HTMLInputElement || event.target instanceof HTMLTextAreaElement) return
-      if (event.key === " ") { event.preventDefault(); player.togglePlaying() }
-      if (event.key.toLowerCase() === "m") player.toggleMuted()
-      if (event.key.toLowerCase() === "t") onTheater()
-      if (event.key.toLowerCase() === "f") void (document.fullscreenElement ? document.exitFullscreen() : rootRef.current?.requestFullscreen())
-      if (event.key === "ArrowRight") player.seek(player.currentTime + 5)
-      if (event.key === "ArrowLeft") player.seek(player.currentTime - 5)
+    const config = createPlayerConfig(video)
+    const root = rootRef.current
+    if (!config || !root) return
+
+    setLoadState("loading")
+    window.PLAYER_CONFIG = config
+    let cancelled = false
+    let script: HTMLScriptElement | null = null
+    let jwScript: HTMLScriptElement | null = null
+
+    const loadPlayer = () => {
+      if (cancelled) return
+      script = document.createElement("script")
+      script.src = playerScript
+      script.async = true
+      script.dataset.watchPlayer = config.vdoId
+      script.addEventListener("load", () => setLoadState("ready"), {
+        once: true,
+      })
+      script.addEventListener("error", () => setLoadState("error"), {
+        once: true,
+      })
+      document.body.append(script)
     }
-    document.addEventListener("keydown", onKeyDown)
-    return () => document.removeEventListener("keydown", onKeyDown)
-  }, [onTheater, player])
 
-  return <div ref={rootRef} id="watch-player" className="group relative aspect-video w-full overflow-hidden bg-black text-white sm:rounded-xl">
-    <img src={video.thumbnailUrl} alt="" className="size-full object-cover" /><div className="absolute inset-0 bg-black/20" />
-    <button type="button" aria-label={t(player.isPlaying ? "pause" : "play")} onClick={player.togglePlaying} className="absolute inset-0 flex items-center justify-center"><span className="flex size-16 items-center justify-center rounded-full bg-black/55">{player.isPlaying ? <Pause className="size-7 fill-current" /> : <Play className="ml-1 size-7 fill-current" />}</span></button>
-    {captions ? <p className="absolute bottom-20 left-1/2 -translate-x-1/2 rounded bg-black/80 px-3 py-1 text-sm">{t("mockCaption")}</p> : null}
-    <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/90 p-3 pt-10"><input aria-label={t("seek")} type="range" min={0} max={video.durationSeconds} value={player.currentTime} onChange={(event) => player.seek(Number(event.target.value))} className="h-1 w-full accent-red-600" /><div className="mt-2 flex items-center gap-2">
-      <button type="button" onClick={player.togglePlaying}>{player.isPlaying ? <Pause className="size-5 fill-current" /> : <Play className="size-5 fill-current" />}</button><button type="button" onClick={player.toggleMuted}>{player.muted ? <VolumeX className="size-5" /> : <Volume2 className="size-5" />}</button><input aria-label={t("volume")} type="range" min={0} max={1} step={0.05} value={player.volume} onChange={(event) => player.setVolume(Number(event.target.value))} className="hidden w-20 accent-white sm:block" /><span className="text-xs tabular-nums">{clock(player.currentTime)} / {clock(video.durationSeconds)}</span>
-      <div className="ml-auto flex items-center gap-3"><button type="button" aria-pressed={captions} onClick={() => setCaptions((value) => !value)}><Captions className={`size-5 ${captions ? "text-red-500" : ""}`} /></button><div className="relative"><button type="button" onClick={() => setSettingsOpen((value) => !value)}><Settings className="size-5" /></button>{settingsOpen ? <div className="absolute right-0 bottom-8 w-48 rounded-xl bg-black/90 p-3 text-xs shadow-xl"><label className="block">{t("quality")}<select value={quality} onChange={(event) => setQuality(event.target.value)} className="mt-1 w-full rounded bg-white/10 p-2"><option>1080p</option><option>720p</option><option>480p</option></select></label><label className="mt-3 block">{t("speed")}<select value={player.speed} onChange={(event) => player.setSpeed(Number(event.target.value))} className="mt-1 w-full rounded bg-white/10 p-2"><option value={0.5}>0.5x</option><option value={1}>1x</option><option value={1.5}>1.5x</option><option value={2}>2x</option></select></label></div> : null}</div><button type="button" aria-label={t("miniPlayer")} onClick={player.openMiniPlayer}><PictureInPicture2 className="size-5" /></button><button type="button" aria-label={t("theaterMode")} onClick={onTheater}><span className={`block h-4 w-6 border-2 ${theater ? "border-t-4" : ""}`} /></button><button type="button" aria-label={t("fullscreen")} onClick={() => void (document.fullscreenElement ? document.exitFullscreen() : rootRef.current?.requestFullscreen())}>{fullscreen ? <Minimize className="size-5" /> : <Maximize className="size-5" />}</button></div>
-    </div></div>
-  </div>
+    if (typeof window.jwplayer === "function") {
+      loadPlayer()
+    } else {
+      jwScript = document.createElement("script")
+      jwScript.src = jwPlayerScript
+      jwScript.async = true
+      jwScript.addEventListener("load", loadPlayer, { once: true })
+      jwScript.addEventListener("error", () => setLoadState("error"), {
+        once: true,
+      })
+      document.body.append(jwScript)
+    }
+
+    return () => {
+      cancelled = true
+      script?.remove()
+      jwScript?.remove()
+      root.replaceChildren()
+      if (window.PLAYER_CONFIG === config) delete window.PLAYER_CONFIG
+    }
+  }, [
+    video,
+    video.player?.node.playlist,
+    video.player?.node.static,
+    video.player?.vdoId,
+  ])
+
+  const configured = Boolean(video.player)
+  return (
+    <>
+      <link
+        rel="preconnect"
+        href="https://ssl.p.jwpcdn.com"
+        crossOrigin="anonymous"
+      />
+      <link rel="dns-prefetch" href="https://ssl.p.jwpcdn.com" />
+      <link
+        rel="preconnect"
+        href="https://asset-cdn.vdohide.com"
+        crossOrigin="anonymous"
+      />
+      <link rel="stylesheet" href={playerStylesheet} precedence="default" />
+      <div className="relative aspect-video w-full overflow-hidden bg-black sm:rounded-xl">
+        <div
+          ref={rootRef}
+          id="player"
+          aria-label={video.title}
+          className="absolute inset-0"
+        />
+        {configured && loadState !== "error" ? (
+          loadState === "loading" ? (
+            <div
+              className="pointer-events-none absolute inset-0 grid place-items-center bg-black"
+              aria-hidden="true"
+            >
+              <svg
+                viewBox="0 0 240 240"
+                className="size-12 animate-spin fill-white"
+              >
+                <path d="M120 186.667a66.667 66.667 0 010-133.333V40a80 80 0 1080 80h-13.333A66.846 66.846 0 01120 186.667z" />
+              </svg>
+            </div>
+          ) : null
+        ) : (
+          <div className="absolute inset-0">
+            <img
+              src={video.thumbnailUrl || undefined}
+              alt=""
+              className="size-full object-cover"
+            />
+          </div>
+        )}
+      </div>
+    </>
+  )
 }

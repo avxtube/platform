@@ -26,60 +26,129 @@ export type RelationSearchOption = {
 }
 
 type ChannelsResponse = {
-  channels: Array<{ id: string; name: string; handle: string; avatarUrl: string | null; kind: "actor" | "studio" }>
+  channels: Array<{
+    id: string
+    name: string
+    handle: string
+    avatarUrl: string | null
+    kind: "actor" | "studio"
+  }>
 }
-type TermsResponse = { terms: Array<{ id: string; name: string; slug: string; taxonomy: "category" | "tag" }> }
-type ContentsResponse = { items: Array<{ _id: string; title?: string; slug?: string; kind: "video" }> }
+type TermsResponse = {
+  terms: Array<{
+    id: string
+    name: string
+    slug: string
+    taxonomy: "category" | "tag"
+  }>
+}
+type ContentsResponse = {
+  items: Array<{ _id: string; title?: string; slug?: string; kind: "video" }>
+}
 
-export function useRelationOptions(kind: RelationKind, selectedIds: string[], initialOptions: RelationSearchOption[] = []) {
-  const [options, setOptions] = React.useState<RelationSearchOption[]>(() => uniqueRelations(initialOptions))
+export function useRelationOptions(
+  kind: RelationKind,
+  selectedIds: string[],
+  initialOptions: RelationSearchOption[] = []
+) {
+  const [options, setOptions] = React.useState<RelationSearchOption[]>(() =>
+    uniqueRelations(initialOptions)
+  )
   const [searching, setSearching] = React.useState(false)
   const requestRef = React.useRef<AbortController | null>(null)
   const knownIdKey = options.map((option) => option.id).join(",")
-  const knownIdSet = React.useMemo(() => new Set(knownIdKey ? knownIdKey.split(",") : []), [knownIdKey])
+  const knownIdSet = React.useMemo(
+    () => new Set(knownIdKey ? knownIdKey.split(",") : []),
+    [knownIdKey]
+  )
   const selectedKey = selectedIds.join(",")
-  const selectedIdSet = React.useMemo(() => new Set(selectedKey ? selectedKey.split(",") : []), [selectedKey])
-  const missingSelectedKey = selectedIds.filter((id) => !knownIdSet.has(id)).join(",")
+  const selectedIdSet = React.useMemo(
+    () => new Set(selectedKey ? selectedKey.split(",") : []),
+    [selectedKey]
+  )
+  const missingSelectedKey = selectedIds
+    .filter((id) => !knownIdSet.has(id))
+    .join(",")
 
-  const load = React.useCallback(async (params: URLSearchParams) => {
-    requestRef.current?.abort()
-    const controller = new AbortController()
-    requestRef.current = controller
-    setSearching(true)
+  const load = React.useCallback(
+    async (params: URLSearchParams) => {
+      requestRef.current?.abort()
+      const controller = new AbortController()
+      requestRef.current = controller
+      setSearching(true)
 
-    try {
-      const isChannel = kind === "actor" || kind === "studio"
-      const isContent = kind === "video"
-      params.set(isChannel || isContent ? "kind" : "taxonomy", kind)
-      const requestedIds = params.get("ids")?.split(",").filter(Boolean) ?? []
-      params.set("limit", requestedIds.length ? String(Math.min(requestedIds.length, 100)) : "12")
-      if (isContent && params.has("q")) {
-        params.set("query", params.get("q") ?? "")
-        params.delete("q")
+      try {
+        const isChannel = kind === "actor" || kind === "studio"
+        const isContent = kind === "video"
+        params.set(isChannel || isContent ? "kind" : "taxonomy", kind)
+        const requestedIds = params.get("ids")?.split(",").filter(Boolean) ?? []
+        params.set(
+          "limit",
+          requestedIds.length
+            ? String(Math.min(requestedIds.length, 100))
+            : "12"
+        )
+        if (isContent && params.has("q")) {
+          params.set("query", params.get("q") ?? "")
+          params.delete("q")
+        }
+        const response = await fetch(
+          `/api/v1/${isContent ? "admin/contents" : isChannel ? "admin/channels" : "terms"}?${params.toString()}`,
+          {
+            headers: { accept: "application/json" },
+            signal: controller.signal,
+          }
+        )
+        if (!response.ok) throw new Error(`API returned ${response.status}`)
+        const result = (await response.json()) as
+          | ChannelsResponse
+          | TermsResponse
+          | ContentsResponse
+        const items: RelationSearchOption[] =
+          "items" in result
+            ? result.items.map((content) => ({
+                id: content._id,
+                name: content.title || content.slug || content._id,
+                description: content.slug || content._id,
+                avatarUrl: null,
+                kind: "video" as const,
+              }))
+            : "channels" in result
+              ? result.channels.map((channel) => ({
+                  id: channel.id,
+                  name: channel.name,
+                  description: `@${channel.handle.replace(/^@/, "")}`,
+                  avatarUrl: channel.avatarUrl,
+                  kind,
+                }))
+              : result.terms.map((term) => ({
+                  id: term.id,
+                  name: term.name,
+                  description: term.slug,
+                  avatarUrl: null,
+                  kind: term.taxonomy,
+                }))
+        const query = (params.get("q") ?? params.get("query"))
+          ?.trim()
+          .toLowerCase()
+        const matches = query
+          ? items.filter((item) => relationMatchesQuery(item, query))
+          : items
+        setOptions((current) =>
+          uniqueRelations([
+            ...current.filter((item) => selectedIdSet.has(item.id)),
+            ...matches,
+          ])
+        )
+      } catch (error) {
+        if (!(error instanceof DOMException && error.name === "AbortError"))
+          setOptions([])
+      } finally {
+        if (requestRef.current === controller) setSearching(false)
       }
-      const response = await fetch(`/api/v1/${isContent ? "admin/contents" : isChannel ? "channels" : "terms"}?${params.toString()}`, {
-        headers: { accept: "application/json" },
-        signal: controller.signal,
-      })
-      if (!response.ok) throw new Error(`API returned ${response.status}`)
-      const result = await response.json() as ChannelsResponse | TermsResponse | ContentsResponse
-      const items: RelationSearchOption[] = "items" in result
-        ? result.items.map((content) => ({ id: content._id, name: content.title || content.slug || content._id, description: content.slug || content._id, avatarUrl: null, kind: "video" as const }))
-        : "channels" in result
-        ? result.channels.map((channel) => ({ id: channel.id, name: channel.name, description: `@${channel.handle.replace(/^@/, "")}`, avatarUrl: channel.avatarUrl, kind: channel.kind }))
-        : result.terms.map((term) => ({ id: term.id, name: term.name, description: term.slug, avatarUrl: null, kind: term.taxonomy }))
-      const query = (params.get("q") ?? params.get("query"))?.trim().toLowerCase()
-      const matches = query ? items.filter((item) => relationMatchesQuery(item, query)) : items
-      setOptions((current) => uniqueRelations([
-        ...current.filter((item) => selectedIdSet.has(item.id)),
-        ...matches,
-      ]))
-    } catch (error) {
-      if (!(error instanceof DOMException && error.name === "AbortError")) setOptions([])
-    } finally {
-      if (requestRef.current === controller) setSearching(false)
-    }
-  }, [kind, selectedIdSet])
+    },
+    [kind, selectedIdSet]
+  )
 
   React.useEffect(() => {
     if (!missingSelectedKey) return
@@ -94,16 +163,19 @@ export function useRelationOptions(kind: RelationKind, selectedIds: string[], in
     }
   }, [load, missingSelectedKey])
 
-  const search = React.useCallback((query: string) => {
-    const normalized = query.trim()
-    if (normalized.length < 2) {
-      requestRef.current?.abort()
-      setSearching(false)
-      setOptions([])
-      return
-    }
-    void load(new URLSearchParams({ q: normalized }))
-  }, [load])
+  const search = React.useCallback(
+    (query: string) => {
+      const normalized = query.trim()
+      if (normalized.length < 2) {
+        requestRef.current?.abort()
+        setSearching(false)
+        setOptions([])
+        return
+      }
+      void load(new URLSearchParams({ q: normalized }))
+    },
+    [load]
+  )
 
   const addOptions = React.useCallback((items: RelationSearchOption[]) => {
     setOptions((current) => uniqueRelations([...current, ...items]))

@@ -1,112 +1,109 @@
-import { Router, type Request, type Response } from "express"
+import { Router } from "express"
 import { ChannelModel } from "@workspace/db/models"
-
-import { mockChannels } from "../data/mock-channels"
+import { CHANNEL_KINDS, CHANNEL_ROLES } from "@workspace/core/types/channel"
 import {
-  getMockChannelCourses,
-  getMockChannelPosts,
-} from "../data/mock-channel-content"
-import { mockPlaylists } from "../data/mock-playlists"
-import { mockShorts } from "../data/mock-shorts"
-import { mockVideos } from "../data/mock-videos"
+  escapeRegExp,
+  getPublicContents,
+  getContentMappers,
+  publicVideoFilter,
+  stringValue,
+  toRecord,
+  numberValue,
+} from "../services/content-video.service"
+import {
+  getPublicChannels,
+  mapChannel,
+  publicChannelFilter,
+} from "../services/channel-viewer.service"
 
 const router: Router = Router()
 
-router.get("/", async (req: Request, res: Response) => {
-  const kind = typeof req.query.kind === "string" ? req.query.kind : null
-  const query =
-    typeof req.query.q === "string" ? req.query.q.trim().toLowerCase() : ""
-  const ids = new Set(
-    typeof req.query.ids === "string"
-      ? req.query.ids
-          .split(",")
-          .map((id) => id.trim())
-          .filter(Boolean)
-      : []
-  )
-  const requestedLimit =
-    Number.parseInt(
-      typeof req.query.limit === "string"
-        ? req.query.limit
-        : ids.size
-          ? String(ids.size)
-          : "12",
-      10
-    ) || 12
-  const limit = Math.max(1, Math.min(requestedLimit, ids.size ? 100 : 30))
-  const filteredMocks = mockChannels.filter((channel) => {
-    if (kind && channel.kind !== kind) return false
-    if (ids.size && !ids.has(channel.id)) return false
-    if (!query) return true
-    return [channel.name, channel.handle, channel.id].some((value) =>
-      value.toLowerCase().includes(query)
-    )
-  })
-  const databaseFilter: Record<string, unknown> = { status: { $ne: "deleted" } }
-  if (kind) databaseFilter.kind = kind
-  if (ids.size) databaseFilter._id = { $in: [...ids] }
-  if (query) {
-    const pattern = new RegExp(escapeRegExp(query), "i")
-    databaseFilter.$or = [
-      { name: pattern },
-      { handle: pattern },
-      { _id: pattern },
-    ]
+router.get("/", async (req, res) => {
+  const filter = publicChannelFilter()
+  const kind = stringValue(req.query.kind)
+  const role = stringValue(req.query.role)
+  if (kind && !CHANNEL_KINDS.some((value) => value === kind)) {
+    res.status(400).json({ error: "Invalid channel kind" })
+    return
   }
-  const databaseChannels = await ChannelModel.find(databaseFilter)
-    .limit(limit)
-    .lean()
-  const channels = [
-    ...databaseChannels.map((channel) => ({
-      id: channel._id,
-      name: channel.name,
-      handle: channel.handle,
-      avatarUrl: channel.avatarUrl ?? null,
-      kind: channel.kind,
-    })),
-    ...filteredMocks,
-  ]
-  const uniqueChannels = [
-    ...new Map(channels.map((channel) => [channel.id, channel])).values(),
-  ]
-  res
-    .status(200)
-    .json({
-      channels: uniqueChannels.slice(0, limit),
-      total: uniqueChannels.length,
-    })
+  if (role && !CHANNEL_ROLES.some((value) => value === role)) {
+    res.status(400).json({ error: "Invalid channel role" })
+    return
+  }
+  if (kind) filter.kind = kind
+  if (role) filter["metadata.roles"] = role
+  const ids = stringValue(req.query.ids)
+    .split(",")
+    .map((id) => id.trim())
+    .filter(Boolean)
+    .slice(0, 100)
+  if (ids.length) filter._id = { $in: ids }
+  const q = stringValue(req.query.q).slice(0, 200)
+  if (q) {
+    const pattern = new RegExp(escapeRegExp(q), "i")
+    filter.$or = [{ name: pattern }, { handle: pattern }]
+  }
+  const limit = Math.min(
+    100,
+    Math.max(
+      1,
+      Number.parseInt(stringValue(req.query.limit), 10) || ids.length || 30
+    )
+  )
+  const offset = Math.max(
+    0,
+    Number.parseInt(stringValue(req.query.cursor), 10) || 0
+  )
+  const [rows, total] = await Promise.all([
+    getPublicChannels(filter, limit, offset),
+    ChannelModel.countDocuments(filter),
+  ])
+  res.json({
+    channels: rows.map(mapChannel),
+    total,
+    nextCursor:
+      offset + rows.length < total ? String(offset + rows.length) : null,
+  })
 })
 
-router.get("/:handle", (req: Request<{ handle: string }>, res: Response) => {
-  const normalized = req.params.handle.replace(/^@/, "").toLowerCase()
-  const channel = mockChannels.find(
-    (item) => item.handle.toLowerCase() === normalized
+router.get("/:handle", async (req, res) => {
+  const handle = req.params.handle.replace(/^@/, "").toLowerCase()
+  const [row] = await getPublicChannels(
+    { ...publicChannelFilter(), $or: [{ handle }, { _id: req.params.handle }] },
+    1
   )
-
-  if (!channel) {
+  if (!row) {
     res.status(404).json({ error: "Channel not found" })
     return
   }
-
-  const videos = mockVideos.filter((video) => video.channel.id === channel.id)
-  const shorts = mockShorts.filter((short) => short.channel.id === channel.id)
-  const playlists = mockPlaylists.filter(
-    (playlist) =>
-      playlist.owner === channel.name ||
-      playlist.items.some((video) => video.channel?.id === channel.id)
+  const channel = mapChannel(row)
+  const { mapVideo, mapShort } = await getContentMappers()
+  const [videos, shorts, posts] = await Promise.all(
+    ["video", "short", "post"].map((kind) =>
+      getPublicContents(
+        { ...publicVideoFilter(kind), channelIds: channel.id },
+        48
+      )
+    )
   )
-  const courses = channel.enabledTabs.includes("courses")
-    ? getMockChannelCourses(channel.id)
-    : []
-  const posts = channel.enabledTabs.includes("posts")
-    ? getMockChannelPosts(channel.id)
-    : []
-
-  res.status(200).json({ channel, videos, shorts, playlists, courses, posts })
+  res.json({
+    channel,
+    videos: (videos ?? []).map(mapVideo),
+    shorts: (shorts ?? []).map(mapShort),
+    playlists: [],
+    courses: [],
+    posts: (posts ?? []).map((content) => {
+      const video = mapVideo(content)
+      return {
+        id: video.id,
+        message: video.description || video.title,
+        imageUrl: video.thumbnailUrl || null,
+        publishedAt: video.publishedAt,
+        likeCount: numberValue(toRecord(content.stats).likeCount),
+        commentCount: numberValue(toRecord(content.stats).commentCount),
+      }
+    }),
+  })
 })
 
 export default router
-
-function escapeRegExp(value: string) {
-  return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")
-}

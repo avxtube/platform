@@ -217,7 +217,7 @@
     "empty": "ไม่มีประวัติการดูที่ตรงกับตัวกรองนี้"
   },
   "channel": {
-    "kind": { "creator": "ครีเอเตอร์", "actor": "นักแสดง", "studio": "Studio" },
+    "kind": { "person": "บุคคล", "organization": "บริษัท / องค์กร", "page": "เพจ", "creator": "ครีเอเตอร์", "actor": "นักแสดง", "studio": "Studio" },
     "verified": "ช่องที่ยืนยันแล้ว",
     "follow": "ติดตาม",
     "following": "ติดตามแล้ว",

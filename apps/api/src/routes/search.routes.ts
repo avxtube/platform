@@ -1,61 +1,127 @@
-import { Router, type Request, type Response } from "express";
-import { mockActors } from "../data/mock-actors";
-import { mockPlaylists } from "../data/mock-playlists";
-import { mockShorts } from "../data/mock-shorts";
-import { mockVideos } from "../data/mock-videos";
+import { Router } from "express"
+import {
+  ChannelModel,
+  ContentModel,
+  MediaModel,
+  TermModel,
+} from "@workspace/db/models"
+import {
+  getPublicChannels,
+  mapActor,
+  publicChannelFilter,
+} from "../services/channel-viewer.service"
+import {
+  escapeRegExp,
+  getPublicContents,
+  getContentMappers,
+  publicVideoFilter,
+  stringValue,
+} from "../services/content-video.service"
 
-const router: Router = Router();
-
-function text(value: unknown) {
-  return typeof value === "string" ? value : "";
-}
-
-function matches(values: string[], query: string) {
-  return !query || values.join(" ").toLocaleLowerCase().includes(query);
-}
-
-router.get("/", (req: Request, res: Response) => {
-  const query = text(req.query.q).trim().toLocaleLowerCase();
-  const type = text(req.query.type) || "all";
-  const duration = text(req.query.duration) || "any";
-  const uploaded = text(req.query.uploaded) || "any";
-  const feature = text(req.query.feature) || "any";
-  const sort = text(req.query.sort) || "relevance";
-  const watched = text(req.query.watched) || "any";
-
-  const filterVideo = (video: (typeof mockVideos)[number], index: number) => {
-    if (!matches([video.title, video.description, video.category, video.channel.name, video.channel.handle], query)) return false;
-    if (duration === "short" && video.durationSeconds > 180) return false;
-    if (duration === "medium" && (video.durationSeconds <= 180 || video.durationSeconds > 1200)) return false;
-    if (duration === "long" && video.durationSeconds <= 1200) return false;
-    const ageDays = Math.max(0, (Date.now() - new Date(video.publishedAt).getTime()) / 86_400_000);
-    if (uploaded === "today" && ageDays > 1) return false;
-    if (uploaded === "week" && ageDays > 7) return false;
-    if (uploaded === "month" && ageDays > 31) return false;
-    if (uploaded === "year" && ageDays > 366) return false;
-    if (feature === "4k" && video.viewCount < 500_000) return false;
-    if (feature === "captions" && index % 2 !== 0) return false;
-    if (watched === "watched" && index % 3 !== 0) return false;
-    if (watched === "unwatched" && index % 3 === 0) return false;
-    return true;
-  };
-
-  const sortItems = <Item extends { viewCount: number; publishedAt: string }>(items: Item[]) => {
-    if (sort === "views") return items.sort((a, b) => b.viewCount - a.viewCount);
-    if (sort === "latest") return items.sort((a, b) => new Date(b.publishedAt).getTime() - new Date(a.publishedAt).getTime());
-    return items;
-  };
-
-  const videos = type === "short" || type === "live" ? [] : sortItems(mockVideos.filter(filterVideo));
-  const shorts = type === "video" || type === "live" ? [] : sortItems(mockShorts.filter(filterVideo));
-  const actors = type === "all" && query
-    ? mockActors.filter((actor) => matches([actor.name, actor.handle, actor.bio], query)).slice(0, 8)
-    : [];
-  const playlists = type === "all" && query
-    ? mockPlaylists.filter((playlist) => matches([playlist.title, playlist.description, playlist.owner], query))
-    : [];
-
-  res.status(200).json({ videos, shorts, actors, playlists, total: videos.length + shorts.length + actors.length + playlists.length });
-});
-
-export default router;
+const router: Router = Router()
+router.get("/", async (req, res) => {
+  const q = stringValue(req.query.q).slice(0, 200)
+  const type = stringValue(req.query.type) || "all"
+  const filter: Record<string, unknown> = {
+    ...publicVideoFilter(),
+    kind:
+      type === "live"
+        ? "live"
+        : type === "video"
+          ? "video"
+          : type === "short"
+            ? "short"
+            : { $in: ["video", "short"] },
+  }
+  const pattern = new RegExp(escapeRegExp(q), "i")
+  const channelSearch = {
+    ...publicChannelFilter(),
+    $or: [{ name: pattern }, { handle: pattern }],
+  }
+  if (q) {
+    const [channelIds, termIds] = await Promise.all([
+      ChannelModel.distinct("_id", channelSearch),
+      TermModel.distinct("_id", {
+        status: "active",
+        deletedAt: null,
+        name: pattern,
+      }),
+    ])
+    filter.$or = [
+      { title: pattern },
+      { description: pattern },
+      { channelIds: { $in: channelIds } },
+      { termIds: { $in: termIds } },
+    ]
+  }
+  const days: Record<string, number> = {
+    today: 1,
+    week: 7,
+    month: 31,
+    year: 366,
+  }
+  const age = days[stringValue(req.query.uploaded)]
+  if (age) filter.createdAt = { $gte: new Date(Date.now() - age * 86400000) }
+  const duration = stringValue(req.query.duration)
+  const constraints: Record<string, unknown>[] = []
+  if (["short", "medium", "long"].includes(duration)) {
+    const seconds = {
+      $max: [
+        { $ifNull: ["$metadata.duration", 0] },
+        { $ifNull: ["$metadata.hls.media.duration", 0] },
+      ],
+    }
+    const comparison =
+      duration === "short"
+        ? { $lte: [seconds, 180] }
+        : duration === "long"
+          ? { $gt: [seconds, 1200] }
+          : { $and: [{ $gt: [seconds, 180] }, { $lte: [seconds, 1200] }] }
+    const ids = await MediaModel.distinct("_id", {
+      deletedAt: null,
+      error: null,
+      purpose: { $in: ["video", "short"] },
+      $expr: comparison,
+    })
+    constraints.push({ mediaIds: { $in: ids } })
+  }
+  const feature = stringValue(req.query.feature)
+  if (feature === "4k" || feature === "captions") {
+    const ids = await MediaModel.distinct("_id", {
+      deletedAt: null,
+      error: null,
+      ...(feature === "4k"
+        ? {
+            purpose: { $in: ["video", "short"] },
+            "metadata.height": { $gte: 2160 },
+          }
+        : { kind: "subtitle" }),
+    })
+    constraints.push({ mediaIds: { $in: ids } })
+  }
+  if (constraints.length) filter.$and = constraints
+  const sort: Record<string, 1 | -1> =
+    req.query.sort === "views"
+      ? { "stats.viewCount": -1, createdAt: -1, _id: -1 }
+      : { createdAt: -1, _id: -1 }
+  const [contents, totalContents, actors, { mapVideo, mapShort }] =
+    await Promise.all([
+      getPublicContents(filter, 50, 0, sort),
+      ContentModel.countDocuments(filter),
+      type === "all" && q
+        ? getPublicChannels(
+            { ...channelSearch, kind: "person", "metadata.roles": "actor" },
+            8
+          )
+        : [],
+      getContentMappers(),
+    ])
+  res.json({
+    videos: contents.filter((item) => item.kind === "video").map(mapVideo),
+    shorts: contents.filter((item) => item.kind === "short").map(mapShort),
+    actors: actors.map(mapActor),
+    playlists: [],
+    total: totalContents + actors.length,
+  })
+})
+export default router
