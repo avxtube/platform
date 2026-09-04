@@ -26,6 +26,8 @@ const queueImportSchema = new Schema(
 );
 
 queueImportSchema.index({ status: 1, createdAt: 1 });
+// Worker claims use status/createdAt; stale processing leases use startedAt.
+queueImportSchema.index({ status: 1, startedAt: 1, createdAt: 1 });
 
 export type QueueImportSchemaType = InferSchemaType<typeof queueImportSchema>;
 
