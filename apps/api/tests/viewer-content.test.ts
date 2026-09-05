@@ -14,6 +14,7 @@ import {
   getContentMappers,
   mediaUrl,
   publicVideoFilter,
+  publicVideoListFilter,
 } from "../src/services/content-video.service"
 import videosRouter from "../src/routes/videos.routes"
 
@@ -29,13 +30,16 @@ function fixture() {
     createdAt: new Date("2026-09-03T00:00:00Z"),
     stats: { viewCount: 5, likeCount: 2 },
     // Lookup results are not necessarily returned in reference order.
-    channelIds: ["actor-b", "actor-a", "studio"],
+    studioIds: ["studio"],
+    actressIds: ["actor-b"],
+    actorIds: ["actor-a"],
+    directorIds: ["director"],
     channels: [
       {
         _id: "actor-a",
         name: "Actor A",
         handle: "actora",
-        metadata: { roles: ["actor"] },
+        metadata: { roles: ["actor"], gender: "male" },
       },
       {
         _id: "studio",
@@ -47,7 +51,13 @@ function fixture() {
         _id: "actor-b",
         name: "Actor B",
         handle: "actorb",
-        metadata: { roles: ["actor"] },
+        metadata: { roles: ["actor"], gender: "female" },
+      },
+      {
+        _id: "director",
+        name: "Director",
+        handle: "director",
+        metadata: { roles: ["director"] },
       },
     ],
     mediaIds: ["thumb", "poster", "trailer", "low", "high"],
@@ -113,6 +123,13 @@ test("public filter uses current schema, excludes non-public or unpublished cont
   })
   assert.equal(publicVideoFilter("short").kind, "short")
 })
+test("trending video filter requires a real view count", () => {
+  assert.deepEqual(publicVideoListFilter("trending"), {
+    ...publicVideoFilter(),
+    "stats.viewCount": { $gt: 0 },
+  })
+  assert.deepEqual(publicVideoListFilter(), publicVideoFilter())
+})
 test("pagination happens before indexed reference lookups, and sorting has an ID tie-breaker", () => {
   const pipeline = contentPagePipeline(publicVideoFilter(), 8, 16)
   assert.deepEqual(pipeline.slice(0, 4), [
@@ -124,10 +141,12 @@ test("pagination happens before indexed reference lookups, and sorting has an ID
   const joins = pipeline
     .filter((stage) => "$lookup" in stage)
     .map((stage) => stage.$lookup)
+  assert.ok(joins[0]?.let?.relationIds)
   assert.deepEqual(
-    joins.map((join) => [join.from, join.localField, join.foreignField]),
+    joins
+      .slice(1)
+      .map((join) => [join.from, join.localField, join.foreignField]),
     [
-      ["channels", "channelIds", "_id"],
       ["medias", "mediaIds", "_id"],
       ["terms", "termIds", "_id"],
     ]
@@ -153,18 +172,34 @@ test("maps poster, trailer and highest video rendition from media only", () => {
   assert.equal(video.category, "B")
   assert.equal(video.description, "A description")
   assert.equal(video.channel?.id, "studio")
+  assert.deepEqual(
+    video.directors?.map((item) => item.id),
+    ["director"]
+  )
   assert.equal(video.id, "example-video")
   assert.equal(JSON.stringify(video).includes("private-token"), false)
   assert.equal(JSON.stringify(video).includes("referrerUrl"), false)
 })
-test("falls back to first actor in channelIds order, never lookup order", () => {
+test("falls back to the first performer in explicit relation order", () => {
   const content = fixture()
-  content.channelIds = ["actor-b", "actor-a"]
+  content.studioIds = []
   assert.equal(mapContentToVideo(content).channel?.id, "actor-b")
+})
+test("legacy channelIds remain readable", () => {
+  const content = fixture()
+  content.studioIds = []
+  content.actressIds = []
+  content.actorIds = []
+  content.directorIds = []
+  Object.assign(content, { channelIds: ["actor-a"] })
+  assert.equal(mapContentToVideo(content).channel?.id, "actor-a")
 })
 test("missing and unrelated references do not fabricate an AVXTUBE channel or URL", () => {
   const content = fixture()
-  content.channelIds = ["missing"]
+  content.studioIds = ["missing"]
+  content.actressIds = []
+  content.actorIds = []
+  content.directorIds = []
   content.mediaIds = []
   const video = mapContentToVideo(content)
   assert.equal(video.channel, undefined)
@@ -214,11 +249,13 @@ test("minimal content and shorts with no channel are valid", () => {
   assert.equal(short.likeCount, 10)
   assert.equal(short.commentPolicy, "disabled")
 })
-test("video details expose release date, channels, categories, and tags", () => {
+test("video details expose release date, channels, and every term taxonomy", () => {
   const video = mapContentToVideo({
     _id: "video-id",
     metadata: { releaseDate: "2025-04-03" },
-    channelIds: ["actor-id", "studio-id"],
+    studioIds: ["studio-id"],
+    actorIds: ["actor-id"],
+    directorIds: ["director-id"],
     channels: [
       {
         _id: "studio-id",
@@ -234,8 +271,15 @@ test("video details expose release date, channels, categories, and tags", () => 
         kind: "person",
         metadata: { roles: ["actor"] },
       },
+      {
+        _id: "director-id",
+        name: "Director",
+        handle: "director",
+        kind: "person",
+        metadata: { roles: ["director"] },
+      },
     ],
-    termIds: ["category-id", "tag-id"],
+    termIds: ["category-id", "tag-id", "label-id", "series-id"],
     terms: [
       {
         _id: "tag-id",
@@ -249,13 +293,49 @@ test("video details expose release date, channels, categories, and tags", () => 
         slug: "category",
         taxonomy: "category",
       },
+      {
+        _id: "label-id",
+        name: "Label",
+        slug: "label",
+        taxonomy: "label",
+      },
+      {
+        _id: "series-id",
+        name: "Series",
+        slug: "series",
+        taxonomy: "series",
+      },
     ],
   })
   assert.equal(video.releaseDate, "2025-04-03T00:00:00.000Z")
-  assert.deepEqual(video.actors?.map((item) => item.name), ["Actor"])
-  assert.deepEqual(video.studios?.map((item) => item.name), ["Studio"])
-  assert.deepEqual(video.categories?.map((item) => item.name), ["Category"])
-  assert.deepEqual(video.tags?.map((item) => item.name), ["Tag"])
+  assert.deepEqual(
+    video.actors?.map((item) => item.name),
+    ["Actor"]
+  )
+  assert.deepEqual(
+    video.studios?.map((item) => item.name),
+    ["Studio"]
+  )
+  assert.deepEqual(
+    video.directors?.map((item) => item.name),
+    ["Director"]
+  )
+  assert.deepEqual(
+    video.categories?.map((item) => item.name),
+    ["Category"]
+  )
+  assert.deepEqual(
+    video.tags?.map((item) => item.name),
+    ["Tag"]
+  )
+  assert.deepEqual(
+    video.labels?.map((item) => item.name),
+    ["Label"]
+  )
+  assert.deepEqual(
+    video.series?.map((item) => item.name),
+    ["Series"]
+  )
   assert.equal(video.channel?.name, "Studio")
 })
 test("channel statistics are joined from public content, not stale counters", () => {
@@ -281,7 +361,7 @@ test("channel statistics are joined from public content, not stale counters", ()
   assert.equal(channel.metadata?.secret, undefined)
   const pipeline = channelPagePipeline({ status: "active", deletedAt: null })
   const lookup = pipeline.find((stage) => "$lookup" in stage)?.$lookup
-  assert.equal(lookup?.foreignField, "channelIds")
+  assert.equal(lookup?.let?.channelId, "$_id")
   assert.ok(JSON.stringify(lookup).includes('"visibility":"public"'))
 })
 

@@ -22,20 +22,38 @@ export function editorMetadata(
     "thumbnailMediaId",
   ])
     delete metadata[field]
-  if (content.channelIds) {
-    metadata.studioId =
-      relations.channels.find((item) => item.positions.includes("studio"))
-        ?.id ?? ""
-    metadata.actorIds = relations.channels
+  metadata.studioIds =
+    content.studioIds ??
+    relations.channels
+      .filter((item) => item.positions.includes("studio"))
+      .map((item) => item.id)
+  metadata.actressIds =
+    content.actressIds ??
+    relations.channels
+      .filter((item) => item.positions.includes("actresses"))
+      .map((item) => item.id)
+  metadata.actorIds =
+    content.actorIds ??
+    relations.channels
       .filter((item) => item.positions.includes("actors"))
       .map((item) => item.id)
-  }
+  metadata.directorIds =
+    content.directorIds ??
+    relations.channels
+      .filter((item) => item.positions.includes("directors"))
+      .map((item) => item.id)
   if (content.termIds) {
     metadata.categoryIds = relations.terms
       .filter((item) => item.taxonomy === "category")
       .map((item) => item.id)
     metadata.tagIds = relations.terms
       .filter((item) => item.taxonomy === "tag")
+      .map((item) => item.id)
+    metadata.labelIds = relations.terms
+      .filter((item) => item.taxonomy === "label")
+      .map((item) => item.id)
+    metadata.seriesIds = relations.terms
+      .filter((item) => item.taxonomy === "series")
       .map((item) => item.id)
   }
   if (content.mediaIds || relations.media.length) {
@@ -56,30 +74,19 @@ export function contentEditorReferences(
   content?: AdminContent
 ) {
   const relations = content?.relations
-  const handledChannels = new Set(
-    relations?.channels
-      .filter((item) =>
-        item.positions.some(
-          (position) => position === "studio" || position === "actors"
-        )
-      )
-      .map((item) => item.id)
-  )
   const handledTerms = new Set(relations?.terms.map((item) => item.id))
-  const channelIds = strings([
-    ...(content?.channelIds ?? []).filter((id) => !handledChannels.has(id)),
-    metadata.studioId,
-    ...strings(metadata.actorIds),
-  ])
-  // A single studio control cannot represent additional studios: retain them.
-  const studios =
-    relations?.channels.filter((item) => item.positions.includes("studio")) ??
-    []
-  channelIds.push(...studios.slice(1).map((item) => item.id))
+  const studioIds = strings(
+    metadata.studioIds ?? (metadata.studioId ? [metadata.studioId] : [])
+  )
+  const actressIds = strings(metadata.actressIds)
+  const actorIds = strings(metadata.actorIds)
+  const directorIds = strings(metadata.directorIds)
   const termIds = strings([
     ...(content?.termIds ?? []).filter((id) => !handledTerms.has(id)),
     ...strings(metadata.categoryIds),
     ...strings(metadata.tagIds),
+    ...strings(metadata.labelIds),
+    ...strings(metadata.seriesIds),
   ])
   const initial = editorMetadata(content)
   const mediaIds = (
@@ -92,7 +99,7 @@ export function contentEditorReferences(
     const field = mediaField(item.position)
     return !field || metadata[field] === initial[field]
   })
-  return { channelIds: strings(channelIds), termIds, mediaIds }
+  return { studioIds, actressIds, actorIds, directorIds, termIds, mediaIds }
 }
 
 function mediaField(position: string) {
@@ -137,5 +144,8 @@ function hasUncensoredLeakPath(value: unknown) {
 }
 
 function normalizeCategoryName(value: string) {
-  return value.trim().toLowerCase().replace(/[\s_]+/g, "-")
+  return value
+    .trim()
+    .toLowerCase()
+    .replace(/[\s_]+/g, "-")
 }

@@ -78,9 +78,12 @@
   "showMore": "Show more",
   "showLess": "Show less",
   "detailsActors": "Actors",
+  "detailsDirectors": "Directors",
   "detailsStudios": "Studios",
   "detailsCategories": "Categories",
   "detailsTags": "Tags",
+  "detailsLabels": "Labels",
+  "detailsSeries": "Series",
   "autoplay": "Autoplay",
   "loadMore": "Load more videos",
   "loadMoreComments": "Load more comments",
@@ -155,8 +158,8 @@
     "shortViews": "{count} views",
     "moreOptions": "More options",
     "noCategoryTitle": "No videos in this category",
-      "noCategoryDescription": "Try selecting another category.",
-      "categoryLoadError": "Could not load this category.",
+    "noCategoryDescription": "Try selecting another category.",
+    "categoryLoadError": "Could not load this category.",
     "emptyTitle": "No published videos yet",
     "emptyDescription": "Published videos, Shorts, and public playlists will appear here.",
     "playlistLabel": "Playlist {title}",
@@ -171,6 +174,7 @@
     "previousShorts": "Previous Shorts",
     "nextShorts": "Next Shorts",
     "videos": "Trending videos",
+    "empty": "There is no trending activity yet.",
     "emptyActors": "No trending actors are available right now.",
     "emptyShorts": "No trending Shorts are available right now.",
     "emptyVideos": "No trending videos are available right now."
@@ -198,22 +202,59 @@
     "moreOptions": "More options",
     "verified": "Verified channel",
     "empty": "No videos are available in this collection.",
-    "library": { "title": "Your library", "description": "Your saved videos, playlists, and viewing activity." },
-    "history": { "title": "Watch history", "description": "Videos you watched recently, ordered by time." },
-    "watch-later": { "title": "Watch later", "description": "Videos you saved to watch when you have time." },
-    "liked": { "title": "Liked videos", "description": "All the videos you have liked." }
+    "library": {
+      "title": "Your library",
+      "description": "Your saved videos, playlists, and viewing activity."
+    },
+    "history": {
+      "title": "Watch history",
+      "description": "Videos you watched recently, ordered by time."
+    },
+    "watch-later": {
+      "title": "Watch later",
+      "description": "Videos you saved to watch when you have time."
+    },
+    "liked": {
+      "title": "Liked videos",
+      "description": "All the videos you have liked."
+    }
   },
   "signInPrompt": {
     "action": "Sign in",
-    "following": { "title": "Don't miss new videos", "description": "Sign in to get updates from actors and studios you follow." },
-    "library": { "title": "Enjoy your favorite videos", "description": "Sign in to see videos you liked or saved." },
-    "history": { "title": "Keep track of what you watch", "description": "Watch history is not available while signed out.", "clearWatch": "Clear all watch history", "pauseWatch": "Pause watch history", "clearSearch": "Clear all search history", "pauseSearch": "Pause search history" },
-    "watch-later": { "title": "Save videos for later", "description": "Sign in to build a Watch later list across your devices." },
-    "liked": { "title": "See the videos you liked", "description": "Sign in to view and manage all your liked videos." }
+    "following": {
+      "title": "Don't miss new videos",
+      "description": "Sign in to get updates from actors and studios you follow."
+    },
+    "library": {
+      "title": "Enjoy your favorite videos",
+      "description": "Sign in to see videos you liked or saved."
+    },
+    "history": {
+      "title": "Keep track of what you watch",
+      "description": "Watch history is not available while signed out.",
+      "clearWatch": "Clear all watch history",
+      "pauseWatch": "Pause watch history",
+      "clearSearch": "Clear all search history",
+      "pauseSearch": "Pause search history"
+    },
+    "watch-later": {
+      "title": "Save videos for later",
+      "description": "Sign in to build a Watch later list across your devices."
+    },
+    "liked": {
+      "title": "See the videos you liked",
+      "description": "Sign in to view and manage all your liked videos."
+    }
   },
   "historyPage": {
     "title": "Watch history",
-    "filters": { "all": "All", "video": "Videos", "short": "Shorts", "podcast": "Podcasts", "music": "Music" },
+    "filters": {
+      "all": "All",
+      "video": "Videos",
+      "short": "Shorts",
+      "podcast": "Podcasts",
+      "music": "Music"
+    },
     "today": "Today",
     "search": "Search watch history",
     "clear": "Clear all watch history",
@@ -231,7 +272,14 @@
     "empty": "No watch history matches this filter."
   },
   "channel": {
-    "kind": { "person": "Person", "organization": "Organization", "page": "Page", "creator": "Creator", "actor": "Actor", "studio": "Studio" },
+    "kind": {
+      "person": "Person",
+      "organization": "Organization",
+      "page": "Page",
+      "creator": "Creator",
+      "actor": "Actor",
+      "studio": "Studio"
+    },
     "verified": "Verified channel",
     "follow": "Follow",
     "following": "Following",
@@ -241,7 +289,11 @@
     "description": "Description",
     "moreInfo": "More info",
     "unknownCountry": "Country not specified",
-    "notifications": { "all": "All", "personalized": "Personalized", "none": "None" },
+    "notifications": {
+      "all": "All",
+      "personalized": "Personalized",
+      "none": "None"
+    },
     "subscribers": "{count} subscribers",
     "videoCount": "{count} videos",
     "allVideos": "All videos",
@@ -260,7 +312,17 @@
     "joinedDate": "Joined {date}",
     "totalViews": "Total views",
     "viewCount": "{count} views",
-    "tabs": { "label": "Channel navigation", "home": "Home", "videos": "Videos", "shorts": "Shorts", "live": "Live", "courses": "Courses", "playlists": "Playlists", "posts": "Posts", "about": "About" }
+    "tabs": {
+      "label": "Channel navigation",
+      "home": "Home",
+      "videos": "Videos",
+      "shorts": "Shorts",
+      "live": "Live",
+      "courses": "Courses",
+      "playlists": "Playlists",
+      "posts": "Posts",
+      "about": "About"
+    }
   },
   "search": {
     "resultLabel": "Search results",
@@ -272,14 +334,41 @@
     "videos": "Videos",
     "emptyTitle": "No results found",
     "emptyDescription": "Nothing matched “{query}”. Try another search or remove some filters.",
-    "quick": { "all": "All", "shorts": "Shorts", "unwatched": "Unwatched", "watched": "Watched", "videos": "Videos", "latest": "Recently uploaded", "live": "Live" },
-    "columns": { "type": "Type", "duration": "Duration", "uploaded": "Upload date", "feature": "Features", "sort": "Sort by" },
+    "quick": {
+      "all": "All",
+      "shorts": "Shorts",
+      "unwatched": "Unwatched",
+      "watched": "Watched",
+      "videos": "Videos",
+      "latest": "Recently uploaded",
+      "live": "Live"
+    },
+    "columns": {
+      "type": "Type",
+      "duration": "Duration",
+      "uploaded": "Upload date",
+      "feature": "Features",
+      "sort": "Sort by"
+    },
     "options": {
       "type": { "video": "Video", "short": "Shorts", "live": "Live" },
-      "duration": { "short": "Under 3 minutes", "medium": "3–20 minutes", "long": "Over 20 minutes" },
-      "uploaded": { "today": "Today", "week": "This week", "month": "This month", "year": "This year" },
+      "duration": {
+        "short": "Under 3 minutes",
+        "medium": "3–20 minutes",
+        "long": "Over 20 minutes"
+      },
+      "uploaded": {
+        "today": "Today",
+        "week": "This week",
+        "month": "This month",
+        "year": "This year"
+      },
       "feature": { "hd": "HD", "4k": "4K", "captions": "Captions" },
-      "sort": { "relevance": "Relevance", "latest": "Upload date", "views": "View count" }
+      "sort": {
+        "relevance": "Relevance",
+        "latest": "Upload date",
+        "views": "View count"
+      }
     }
   }
 }

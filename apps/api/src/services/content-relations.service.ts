@@ -29,15 +29,35 @@ export function ids(value: unknown): string[] {
     : []
 }
 
+export function channelHandleBase(value: string) {
+  return value
+    .normalize("NFKD")
+    .toLowerCase()
+    .replace(/[\u0300-\u036f]/g, "")
+    .trim()
+    .replace(/\s+/g, "-")
+    .replace(/[^a-z0-9-]+/g, "-")
+    .replace(/-+/g, "-")
+    .replace(/^-+|-+$/g, "")
+    .slice(0, 80)
+}
+
 export function channelPositions(kind: string, metadata: unknown): string[] {
-  const roles = ids(record(metadata).roles)
+  const channelMetadata = record(metadata)
+  const roles = ids(channelMetadata.roles)
   // Read old records without rewriting their IDs or stored classification.
   if (kind === "actor") roles.push("actor")
   if (kind === "studio") roles.push("studio")
   return [
     ...new Set(
       roles.map((role) =>
-        role === "actor" ? "actors" : role === "director" ? "directors" : role
+        role === "actor"
+          ? channelMetadata.gender === "female"
+            ? "actresses"
+            : "actors"
+          : role === "director"
+            ? "directors"
+            : role
       )
     ),
   ]
@@ -49,11 +69,27 @@ export async function resolveContentRelations(
 ): Promise<ContentRelations> {
   const content = record(value)
   const metadata = record(content.metadata)
-  const channelIds = ids(
-    content.channelIds ?? [metadata.studioId, ...ids(metadata.actorIds)]
+  const studioIds = ids(
+    content.studioIds ?? metadata.studioIds ?? [metadata.studioId]
   )
+  const actressIds = ids(content.actressIds ?? metadata.actressIds)
+  const actorIds = ids(content.actorIds ?? metadata.actorIds)
+  const directorIds = ids(content.directorIds ?? metadata.directorIds)
+  const legacyChannelIds = ids(content.channelIds)
+  const channelIds = ids([
+    ...studioIds,
+    ...actressIds,
+    ...actorIds,
+    ...directorIds,
+    ...legacyChannelIds,
+  ])
   const termIds = ids(
-    content.termIds ?? [...ids(metadata.categoryIds), ...ids(metadata.tagIds)]
+    content.termIds ?? [
+      ...ids(metadata.categoryIds),
+      ...ids(metadata.tagIds),
+      ...ids(metadata.labelIds),
+      ...ids(metadata.seriesIds),
+    ]
   )
   const mediaIds = ids(
     content.mediaIds ??
@@ -97,7 +133,15 @@ export async function resolveContentRelations(
               handle: item.handle,
               avatarUrl: item.avatarUrl ?? null,
               kind: item.kind,
-              positions: channelPositions(item.kind, item.metadata),
+              positions: ids([
+                ...(studioIds.includes(id) ? ["studio"] : []),
+                ...(actressIds.includes(id) ? ["actresses"] : []),
+                ...(actorIds.includes(id) ? ["actors"] : []),
+                ...(directorIds.includes(id) ? ["directors"] : []),
+                ...(legacyChannelIds.includes(id)
+                  ? channelPositions(item.kind, item.metadata)
+                  : []),
+              ]),
             },
           ]
         : []
@@ -114,8 +158,7 @@ export async function resolveContentRelations(
       const legacy = record(item)
       const directUrl =
         item.metadata?.directUrl ?? legacy.url ?? legacy.sourceUrl
-      const contentSlug =
-        typeof content.slug === "string" ? content.slug : ""
+      const contentSlug = typeof content.slug === "string" ? content.slug : ""
       const staticFile =
         item.purpose === "poster"
           ? "poster.jpg"
@@ -187,13 +230,30 @@ export async function prepareContentReferences(
   options: { staticDomain?: string } = {}
 ) {
   const metadata = { ...record(input.metadata) }
-  if ("channelIds" in input || "studioId" in metadata || "actorIds" in metadata)
-    input.channelIds = ids(
-      input.channelIds ?? [metadata.studioId, ...ids(metadata.actorIds)]
+  if ("studioIds" in input || "studioIds" in metadata || "studioId" in metadata)
+    input.studioIds = ids(
+      input.studioIds ?? metadata.studioIds ?? [metadata.studioId]
     )
-  if ("termIds" in input || "categoryIds" in metadata || "tagIds" in metadata)
+  if ("actressIds" in input || "actressIds" in metadata)
+    input.actressIds = ids(input.actressIds ?? metadata.actressIds)
+  if ("actorIds" in input || "actorIds" in metadata)
+    input.actorIds = ids(input.actorIds ?? metadata.actorIds)
+  if ("directorIds" in input || "directorIds" in metadata)
+    input.directorIds = ids(input.directorIds ?? metadata.directorIds)
+  if (
+    "termIds" in input ||
+    "categoryIds" in metadata ||
+    "tagIds" in metadata ||
+    "labelIds" in metadata ||
+    "seriesIds" in metadata
+  )
     input.termIds = ids(
-      input.termIds ?? [...ids(metadata.categoryIds), ...ids(metadata.tagIds)]
+      input.termIds ?? [
+        ...ids(metadata.categoryIds),
+        ...ids(metadata.tagIds),
+        ...ids(metadata.labelIds),
+        ...ids(metadata.seriesIds),
+      ]
     )
 
   const mediaIds = ids(input.mediaIds)
@@ -204,7 +264,16 @@ export async function prepareContentReferences(
 
   // Check existing references before creating URL-only media records.
   await Promise.all([
-    assertReferences(ChannelModel, ids(input.channelIds), "channel"),
+    assertReferences(
+      ChannelModel,
+      ids([
+        ...ids(input.studioIds),
+        ...ids(input.actressIds),
+        ...ids(input.actorIds),
+        ...ids(input.directorIds),
+      ]),
+      "channel"
+    ),
     assertReferences(TermModel, ids(input.termIds), "term"),
     assertReferences(MediaModel, ids(mediaIds), "media"),
   ])
@@ -283,9 +352,14 @@ export async function prepareContentReferences(
     input.mediaIds = ids(mediaIds)
   for (const field of [
     "studioId",
+    "studioIds",
+    "actressIds",
     "actorIds",
+    "directorIds",
     "categoryIds",
     "tagIds",
+    "labelIds",
+    "seriesIds",
     "posterMediaId",
     "trailerMediaId",
     "videoMediaId",

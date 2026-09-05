@@ -55,8 +55,10 @@ export async function getVideosPage(cursor = 0, limit = 8, sort?: "trending"): P
   return fetchJson<CursorPage<Video>>(url);
 }
 
-export async function getVideo(id: string): Promise<Video | null> {
-  const response = await fetch(createVideosApiUrl(`/${encodeURIComponent(id)}`), {
+export async function getVideo(id: string, locale = "en"): Promise<Video | null> {
+  const url = createVideosApiUrl(`/${encodeURIComponent(id)}`);
+  url.searchParams.set("locale", locale);
+  const response = await fetch(url, {
     headers: { accept: "application/json" },
     cache: "no-store",
   });
@@ -70,8 +72,10 @@ export async function getVideo(id: string): Promise<Video | null> {
   return data.video;
 }
 
-export async function getWatchData(id: string): Promise<WatchData | null> {
-  const response = await fetch(createVideosApiUrl(`/${encodeURIComponent(id)}`), {
+export async function getWatchData(id: string, locale = "en"): Promise<WatchData | null> {
+  const url = createVideosApiUrl(`/${encodeURIComponent(id)}`);
+  url.searchParams.set("locale", locale);
+  const response = await fetch(url, {
     headers: { accept: "application/json" },
     cache: "no-store",
   });
@@ -156,15 +160,17 @@ export async function getHistory(requestHeaders?: HeadersInit): Promise<HistoryR
   return fetchJson<HistoryResponse>(new URL(`/${apiVersion}/collections/history`, apiOrigin), requestHeaders);
 }
 
-export async function searchContent(params: Record<string, string>): Promise<SearchResponse> {
+export async function searchContent(params: Record<string, string>, locale = "en"): Promise<SearchResponse> {
   const url = new URL(`/${apiVersion}/search`, apiOrigin);
   for (const [key, value] of Object.entries(params)) if (value) url.searchParams.set(key, value);
+  url.searchParams.set("locale", locale);
   return fetchJson<SearchResponse>(url);
 }
 
-export async function getHomeFeed(category = "all"): Promise<HomeFeedResponse> {
+export async function getHomeFeed(locale = "en", category = "all"): Promise<HomeFeedResponse> {
   const url = new URL(`/${apiVersion}/home`, apiOrigin);
   url.searchParams.set("category", category);
+  url.searchParams.set("locale", locale);
   return fetchJson<HomeFeedResponse>(url);
 }
 

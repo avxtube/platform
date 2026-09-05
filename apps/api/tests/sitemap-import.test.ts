@@ -1,7 +1,22 @@
 import assert from "node:assert/strict"
 import { test } from "node:test"
 
-import { parseMissavSitemap } from "../src/services/sitemap-import.service"
+import {
+  buildQueueImportFilter,
+  parseMissavSitemap,
+} from "../src/services/sitemap-import.service"
+
+test("queue search requires every space-separated term", () => {
+  assert.deepEqual(buildQueueImportFilter("pending", "fc2 123 uncen"), {
+    status: "pending",
+    $and: ["fc2", "123", "uncen"].map((token) => ({
+      $or: [
+        { dvdId: { $regex: token, $options: "i" } },
+        { url: { $regex: token, $options: "i" } },
+      ],
+    })),
+  })
+})
 
 test("keeps only English MissAV items and canonicalizes every MissAV domain", () => {
   const result = parseMissavSitemap(`

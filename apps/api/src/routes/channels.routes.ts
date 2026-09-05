@@ -9,6 +9,7 @@ import {
   stringValue,
   toRecord,
   numberValue,
+  contentChannelFilter,
 } from "../services/content-video.service"
 import {
   getPublicChannels,
@@ -81,7 +82,7 @@ router.get("/:handle", async (req, res) => {
   const [videos, shorts, posts] = await Promise.all(
     ["video", "short", "post"].map((kind) =>
       getPublicContents(
-        { ...publicVideoFilter(kind), channelIds: channel.id },
+        { ...publicVideoFilter(kind), ...contentChannelFilter(channel.id) },
         48
       )
     )

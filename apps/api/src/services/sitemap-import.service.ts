@@ -19,6 +19,26 @@ export type SitemapImportSummary = {
 
 type SitemapItem = { slug: string; url: string }
 
+export function buildQueueImportFilter(status?: string, query?: string) {
+  const filter: Record<string, unknown> = {}
+  if (["pending", "processing", "completed", "failed"].includes(status ?? ""))
+    filter.status = status
+
+  const tokens = (query ?? "")
+    .trim()
+    .split(/\s+/)
+    .filter(Boolean)
+    .slice(0, 8)
+    .map((token) => token.slice(0, 50))
+  if (tokens.length) {
+    filter.$and = tokens.map((token) => {
+      const pattern = { $regex: escapeRegExp(token), $options: "i" }
+      return { $or: [{ dvdId: pattern }, { url: pattern }] }
+    })
+  }
+  return filter
+}
+
 export async function importMissavSitemap(
   sitemapUrl: string
 ): Promise<SitemapImportSummary> {
@@ -43,7 +63,9 @@ export async function importMissavSitemap(
   const urls = parsed.items.map((item) => item.url)
   const [contents, queued] = slugs.length
     ? await Promise.all([
-        ContentModel.find({ slug: { $in: slugs } }).select("slug").lean(),
+        ContentModel.find({ slug: { $in: slugs } })
+          .select("slug")
+          .lean(),
         QueueImportModel.find({
           $or: [{ dvdId: { $in: slugs } }, { url: { $in: urls } }],
         })
@@ -51,7 +73,9 @@ export async function importMissavSitemap(
           .lean(),
       ])
     : [[], []]
-  const contentSlugs = new Set(contents.map((item) => item.slug).filter(Boolean))
+  const contentSlugs = new Set(
+    contents.map((item) => item.slug).filter(Boolean)
+  )
   const queueSlugs = new Set(
     queued.flatMap((item) => (item.dvdId ? [item.dvdId] : []))
   )
@@ -176,6 +200,10 @@ function normalizeSlug(value: string) {
     .replace(/[^\p{L}\p{N}]+/gu, "-")
     .replace(/^-+|-+$/g, "")
     .slice(0, 300)
+}
+
+function escapeRegExp(value: string) {
+  return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")
 }
 
 function decodeXml(value: string) {

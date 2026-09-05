@@ -51,7 +51,7 @@ export function MetadataRelationInput({
   >(() => new Set())
   const uncheckedTermKeys = React.useRef(new Set<string>())
   const currentValue = React.useRef(value)
-  const isTerm = kind === "category" || kind === "tag"
+  const isTerm = ["category", "tag", "label", "series"].includes(kind)
   const canCreate = kind !== "video"
   const existingIds = value.filter((item) => !parsePendingValue(item))
   const resolvedInitialOptions = React.useMemo(
@@ -59,7 +59,15 @@ export function MetadataRelationInput({
       [
         ...(initialOptions?.channels ?? [])
           .filter((channel) =>
-            channel.positions.includes(kind === "actor" ? "actors" : kind)
+            channel.positions.includes(
+              kind === "actress"
+                ? "actresses"
+                : kind === "actor"
+                  ? "actors"
+                  : kind === "director"
+                    ? "directors"
+                    : kind
+            )
           )
           .map((channel) => ({
             id: channel.id,
@@ -238,7 +246,7 @@ export function MetadataRelationInput({
           id: string
           name: string
           slug: string
-          taxonomy: "category" | "tag"
+          taxonomy: "category" | "tag" | "label" | "series"
         }>
       }
       const resolved = new Map(result.terms.map((term) => [term.key, term.id]))
@@ -426,15 +434,23 @@ export function MetadataRelationInput({
           }}
           disabled={disabled}
           placeholder={t(
-            kind === "actor"
-              ? "metadataTypeActor"
-              : kind === "studio"
-                ? "metadataTypeStudio"
-                : kind === "category"
-                  ? "metadataTypeCategory"
-                  : kind === "tag"
-                    ? "metadataTypeTag"
-                    : "metadataTypeVideo"
+            kind === "actress"
+              ? "metadataTypeActress"
+              : kind === "actor"
+                ? "metadataTypeActor"
+                : kind === "director"
+                  ? "metadataTypeDirector"
+                  : kind === "studio"
+                    ? "metadataTypeStudio"
+                    : kind === "category"
+                      ? "metadataTypeCategory"
+                      : kind === "tag"
+                        ? "metadataTypeTag"
+                        : kind === "label"
+                          ? "metadataTypeLabel"
+                          : kind === "series"
+                            ? "metadataTypeSeries"
+                            : "metadataTypeVideo"
           )}
           autoComplete="off"
           className="h-7 min-w-44 flex-1 border-0 px-1 shadow-none focus-visible:ring-0"
@@ -528,7 +544,10 @@ function parsePendingValue(value: string) {
 
 function createPendingValue(kind: RelationKind, name: string) {
   if (kind === "video") return ""
-  return kind === "actor" || kind === "studio"
+  return kind === "actress" ||
+    kind === "actor" ||
+    kind === "director" ||
+    kind === "studio"
     ? createPendingChannelValue(kind, name)
     : createPendingTermValue(kind, name)
 }

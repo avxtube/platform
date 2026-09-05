@@ -1,7 +1,16 @@
 "use client"
 
 import * as React from "react"
-import { ArrowLeft, Link2, Save, Send, SlidersHorizontal } from "lucide-react"
+import {
+  ArrowLeft,
+  Download,
+  Languages,
+  Link2,
+  Loader2,
+  Save,
+  Send,
+  SlidersHorizontal,
+} from "lucide-react"
 import { useLocale, useTranslations } from "next-intl"
 import Link from "next/link"
 import { useRouter } from "next/navigation"
@@ -71,6 +80,7 @@ import {
   contentMediaFieldIds,
 } from "@/components/content-media-fields"
 import { createPendingChannelValue } from "@/components/metadata/pending-channels"
+import { fetchImportedTranslations } from "@/lib/video-translations"
 import { createPendingTermValue } from "@/components/metadata/pending-terms"
 import type { AdminContent, ContentKind } from "@/lib/content"
 import {
@@ -85,9 +95,11 @@ const visibilities = ["public", "unlisted", "private"] as const
 export function ContentForm({
   kind,
   content,
+  translationLocales = [],
 }: {
   kind: ContentKind
   content?: AdminContent
+  translationLocales?: readonly string[]
 }) {
   const t = useTranslations("admin")
   const locale = useLocale()
@@ -125,6 +137,23 @@ export function ContentForm({
   const [descriptionBody, setDescriptionBody] = React.useState(
     content?.description ?? ""
   )
+  const [translated, setTranslated] = React.useState<TranslatedDraft>(() =>
+    initialTranslated(content?.translated)
+  )
+  React.useEffect(() => {
+    setTranslated(initialTranslated(content?.translated))
+  }, [content?._id, content?.translated, content?.updatedAt])
+  const [translationSourceUrl, setTranslationSourceUrl] = React.useState(() =>
+    initialTranslationSourceUrl(content)
+  )
+  const [translationLoading, setTranslationLoading] = React.useState<
+    string | null
+  >(null)
+  const [translationMessage, setTranslationMessage] = React.useState<{
+    locale: string
+    type: "success" | "error"
+    text: string
+  } | null>(null)
   const [status, setStatus] = React.useState(
     () => statuses.find((value) => value === content?.status) ?? "draft"
   )
@@ -159,6 +188,8 @@ export function ContentForm({
     const customOnlyMetadata = splitMetadata(kind, customMetadataValue).custom
     let metadataValue =
       kind === "post" ? {} : { ...customOnlyMetadata, ...registeredMetadata }
+    if (kind === "video")
+      metadataValue = withTranslationSource(metadataValue, translationSourceUrl)
     const missingMetadataField = validateMetadata(kind, metadataValue)
     if (missingMetadataField) {
       setError(
@@ -185,6 +216,7 @@ export function ContentForm({
       title: nullableText(title),
       slug: nullableText(slug),
       description: nullableText(descriptionBody),
+      translated: normalizedTranslated(translated),
       status,
       visibility,
       metadata: metadataValue,
@@ -226,8 +258,12 @@ export function ContentForm({
     const importedSourceUrl = cleanImportedUrl(
       remoteImport?.sourcePageUrl ?? data.sourceUrl ?? result.url ?? ""
     )
-    if (importMedia && importedSourceUrl)
-      setMediaReferrerUrl(importedSourceUrl)
+    const importedTranslations =
+      remoteImport && importedSourceUrl
+        ? await fetchImportedTranslations(importedSourceUrl, translationLocales)
+        : {}
+    if (importedSourceUrl) setTranslationSourceUrl(importedSourceUrl)
+    if (importMedia && importedSourceUrl) setMediaReferrerUrl(importedSourceUrl)
 
     const importedVideoUrl =
       remoteImport?.assets.find((asset) => asset.purpose === "video")
@@ -258,7 +294,8 @@ export function ContentForm({
         sourceUrl: cleanImportedUrl(data.poster),
         purpose: "poster",
         referrerUrl:
-          importedSourceUrl || (remoteImport ? "https://missav.ai/" : undefined),
+          importedSourceUrl ||
+          (remoteImport ? "https://missav.ai/" : undefined),
       })
       preparedPoster = poster
       if (remoteImport) remotePreviewTokensRef.current.add(poster.token)
@@ -279,7 +316,8 @@ export function ContentForm({
       preparedTrailer = await preparePendingVideoFromUrl({
         sourceUrl: cleanImportedUrl(data.trailer),
         referrerUrl:
-          importedSourceUrl || (remoteImport ? "https://missav.ai/" : undefined),
+          importedSourceUrl ||
+          (remoteImport ? "https://missav.ai/" : undefined),
       })
       if (remoteImport)
         remotePreviewTokensRef.current.add(preparedTrailer.token)
@@ -316,15 +354,21 @@ export function ContentForm({
       setSlug(toSlug(data.slug || data.code || ""))
     }
     if (data.content) setDescriptionBody(data.content)
+    if (Object.keys(importedTranslations).length)
+      setTranslated((current) => ({ ...current, ...importedTranslations }))
 
-    const actors = importedNames(data.actresses)
+    const actresses = importedNames(data.actresses)
+    const actors = importedNames(data.actors)
     const studios = importedNames(data.makers)
+    const country = importedNames(data.country)[0]
     const categories = withImportUrlCategories(importedNames(data.genres), [
       result.url,
       data.sourceUrl,
       importedSourceUrl,
     ])
+    const tags = importedNames(data.tags)
     const labels = importedNames(data.labels)
+    const series = importedNames(data.series)
     const directors = importedNames(data.directors)
     setRegisteredMetadata((current) => ({
       ...current,
@@ -333,6 +377,7 @@ export function ContentForm({
         : {}),
       ...(data.code ? { dvdId: data.code } : {}),
       ...(data.releaseDate ? { releaseDate: data.releaseDate } : {}),
+      ...(country ? { country } : {}),
       ...(typeof data.duration === "number"
         ? { durationSeconds: data.duration }
         : {}),
@@ -355,13 +400,31 @@ export function ContentForm({
                 : {}),
           }
         : {}),
-      ...(studios[0]
-        ? { studioId: createPendingChannelValue("studio", studios[0]) }
+      ...(studios.length
+        ? {
+            studioIds: studios.map((name) =>
+              createPendingChannelValue("studio", name)
+            ),
+          }
+        : {}),
+      ...(actresses.length
+        ? {
+            actressIds: actresses.map((name) =>
+              createPendingChannelValue("actress", name)
+            ),
+          }
         : {}),
       ...(actors.length
         ? {
             actorIds: actors.map((name) =>
               createPendingChannelValue("actor", name)
+            ),
+          }
+        : {}),
+      ...(directors.length
+        ? {
+            directorIds: directors.map((name) =>
+              createPendingChannelValue("director", name)
             ),
           }
         : {}),
@@ -372,7 +435,25 @@ export function ContentForm({
             ),
           }
         : {}),
-      ...(labels.length ? { label: labels.join(", ") } : {}),
+      ...(tags.length
+        ? {
+            tagIds: tags.map((name) => createPendingTermValue("tag", name)),
+          }
+        : {}),
+      ...(labels.length
+        ? {
+            labelIds: labels.map((name) =>
+              createPendingTermValue("label", name)
+            ),
+          }
+        : {}),
+      ...(series.length
+        ? {
+            seriesIds: series.map((name) =>
+              createPendingTermValue("series", name)
+            ),
+          }
+        : {}),
     }))
 
     let existingCustom: Record<string, unknown> = {}
@@ -390,7 +471,6 @@ export function ContentForm({
       JSON.stringify(
         {
           ...existingCustom,
-          ...(directors.length ? { directors } : {}),
           import: {
             ...(isPlainRecord(existingCustom.import)
               ? existingCustom.import
@@ -408,6 +488,68 @@ export function ContentForm({
       )
     )
   }
+
+  async function importTranslation(targetLocale: string) {
+    const targetUrl = translationSourceUrl.trim()
+    if (!targetUrl || translationLoading) return
+    setTranslationLoading(targetLocale)
+    setTranslationMessage(null)
+    try {
+      const response = await fetch(
+        `/api/import/video?url=${encodeURIComponent(targetUrl)}&locale=${encodeURIComponent(targetLocale)}`,
+        { headers: { accept: "application/json" } }
+      )
+      const body = (await response.json().catch(() => null)) as
+        | (VideoImportResult & { error?: string })
+        | null
+      if (!response.ok || !body?.data || body.success === false)
+        throw new Error(body?.error ?? t("translationImportFailed"))
+      setTranslated((current) => ({
+        ...current,
+        [targetLocale]: {
+          locale: targetLocale,
+          title: body.data.title ?? "",
+          description: body.data.content ?? "",
+        },
+      }))
+      setTranslationMessage({
+        locale: targetLocale,
+        type: "success",
+        text: t("translationImportSuccess", {
+          code: body.data.code ?? slug ?? "—",
+        }),
+      })
+    } catch (reason) {
+      setTranslationMessage({
+        locale: targetLocale,
+        type: "error",
+        text:
+          reason instanceof Error
+            ? reason.message
+            : t("translationImportFailed"),
+      })
+    } finally {
+      setTranslationLoading(null)
+    }
+  }
+
+  const displayedTranslationLocales = React.useMemo(
+    () => [
+      ...new Set([
+        ...translationLocales,
+        ...Object.keys(translated).sort((left, right) =>
+          left.localeCompare(right)
+        ),
+      ]),
+    ],
+    [translated, translationLocales]
+  )
+  const hasMissingConfiguredTranslation = translationLocales.some(
+    (targetLocale) => {
+      const draft = translated[targetLocale]
+      return !draft?.title.trim() && !draft?.description.trim()
+    }
+  )
 
   async function saveContent(payload: ContentPayload) {
     setPending(true)
@@ -650,8 +792,8 @@ export function ContentForm({
       }
       const payload = {
         ...confirmedPayload,
-        metadata: replacePendingChannels(
-          confirmedPayload.metadata,
+        metadata: replacePendingTerms(
+          replacePendingChannels(confirmedPayload.metadata, resolved),
           resolved
         ) as Record<string, unknown>,
       }
@@ -822,6 +964,7 @@ export function ContentForm({
               <ContentImport
                 disabled={pending}
                 onImported={applyImportedVideo}
+                onUrlChange={setTranslationSourceUrl}
               />
             ) : null}
             {missavImport ? (
@@ -875,6 +1018,145 @@ export function ContentForm({
                 }}
               />
             </AdminMetabox>
+            {kind === "video" ? (
+              <AdminMetabox
+                title={t("translations")}
+                description={t("translationsHelp")}
+              >
+                <div className="space-y-4">
+                  <Field
+                    label={t("translationSourceUrl")}
+                    htmlFor="translation-source-url"
+                  >
+                    <Input
+                      id="translation-source-url"
+                      type="url"
+                      value={translationSourceUrl}
+                      onChange={(event) =>
+                        setTranslationSourceUrl(event.target.value)
+                      }
+                      placeholder={t("translationSourceUrlPlaceholder")}
+                      disabled={pending}
+                    />
+                  </Field>
+                  {displayedTranslationLocales.map((targetLocale) => {
+                    const draft = translated[targetLocale] ?? {
+                      locale: targetLocale,
+                      title: "",
+                      description: "",
+                    }
+                    const hasTranslation = Boolean(
+                      draft.title.trim() || draft.description.trim()
+                    )
+                    const canFetch = translationLocales.includes(targetLocale)
+                    const loading = translationLoading === targetLocale
+                    const message =
+                      translationMessage?.locale === targetLocale
+                        ? translationMessage
+                        : null
+                    return (
+                      <section
+                        key={targetLocale}
+                        className="space-y-3 rounded-lg border p-4"
+                      >
+                        <div className="flex flex-wrap items-center justify-between gap-3">
+                          <div className="flex items-center gap-2">
+                            <Languages className="size-4 text-muted-foreground" />
+                            <h3 className="text-sm font-semibold">
+                              {missavLocaleLabel(targetLocale)}
+                            </h3>
+                          </div>
+                          {!hasTranslation && canFetch ? (
+                            <Button
+                              type="button"
+                              variant="outline"
+                              size="sm"
+                              disabled={
+                                pending ||
+                                Boolean(translationLoading) ||
+                                !translationSourceUrl.trim()
+                              }
+                              onClick={() =>
+                                void importTranslation(targetLocale)
+                              }
+                            >
+                              {loading ? (
+                                <Loader2 className="size-4 animate-spin" />
+                              ) : (
+                                <Download className="size-4" />
+                              )}
+                              {t("translationImportAction")}
+                            </Button>
+                          ) : null}
+                        </div>
+                        <Field
+                          label={t("translationTitle")}
+                          htmlFor={`translated-${targetLocale}-title`}
+                        >
+                          <Input
+                            id={`translated-${targetLocale}-title`}
+                            value={draft.title}
+                            onChange={(event) =>
+                              setTranslationDraft(
+                                setTranslated,
+                                targetLocale,
+                                "title",
+                                event.target.value
+                              )
+                            }
+                            maxLength={1000}
+                            disabled={pending}
+                          />
+                        </Field>
+                        <Field
+                          label={t("translationDescription")}
+                          htmlFor={`translated-${targetLocale}-description`}
+                        >
+                          <Textarea
+                            id={`translated-${targetLocale}-description`}
+                            value={draft.description}
+                            onChange={(event) =>
+                              setTranslationDraft(
+                                setTranslated,
+                                targetLocale,
+                                "description",
+                                event.target.value
+                              )
+                            }
+                            rows={5}
+                            maxLength={20000}
+                            disabled={pending}
+                          />
+                        </Field>
+                        {message ? (
+                          <p
+                            role="status"
+                            className={
+                              message.type === "success"
+                                ? "text-xs text-emerald-600"
+                                : "text-xs text-destructive"
+                            }
+                          >
+                            {message.text}
+                          </p>
+                        ) : null}
+                      </section>
+                    )
+                  })}
+                  {!displayedTranslationLocales.length ? (
+                    <p className="text-xs text-muted-foreground">
+                      {t("translationLocalesEmpty")}
+                    </p>
+                  ) : null}
+                  {hasMissingConfiguredTranslation &&
+                  !translationSourceUrl.trim() ? (
+                    <p className="text-xs text-muted-foreground">
+                      {t("translationSourceRequired")}
+                    </p>
+                  ) : null}
+                </div>
+              </AdminMetabox>
+            ) : null}
             {kind !== "post" ? (
               <>
                 <ContentMediaFields
@@ -924,30 +1206,6 @@ export function ContentForm({
                     </div>
                   </AdminMetabox>
                 ) : null}
-                {kind === "video" || kind === "short" ? (
-                  <>
-                    <MetadataFields
-                      scope={kind}
-                      value={registeredMetadata}
-                      onChange={setRegisteredMetadata}
-                      relationOptions={content?.relations}
-                      disabled={pending}
-                      variant="metabox"
-                      includeFieldIds={["studioId"]}
-                      title={t("contentStudio")}
-                    />
-                    <MetadataFields
-                      scope={kind}
-                      value={registeredMetadata}
-                      onChange={setRegisteredMetadata}
-                      relationOptions={content?.relations}
-                      disabled={pending}
-                      variant="metabox"
-                      includeFieldIds={["actorIds"]}
-                      title={t("contentActors")}
-                    />
-                  </>
-                ) : null}
                 <MetadataFields
                   scope={kind}
                   value={registeredMetadata}
@@ -959,9 +1217,6 @@ export function ContentForm({
                     ...contentMediaFieldIds[kind],
                     "categoryIds",
                     "tagIds",
-                    ...(kind === "video" || kind === "short"
-                      ? ["studioId", "actorIds"]
-                      : []),
                   ]}
                 />
                 <AdminMetabox
@@ -1113,6 +1368,7 @@ type ContentPayload = {
   title: string | null
   slug: string | null
   description: string | null
+  translated: TranslatedDraft
   status: string
   visibility: string
   metadata: Record<string, unknown>
@@ -1123,8 +1379,106 @@ type ContentPayload = {
   }
 }
 
+type TranslationValue = {
+  locale?: string
+  title?: string
+  description?: string
+}
+
+type TranslationDraft = Required<TranslationValue>
+
+type TranslatedDraft = Record<string, TranslationDraft>
+
+function initialTranslated(value: AdminContent["translated"]): TranslatedDraft {
+  if (!value) return {}
+  return Object.fromEntries(
+    Object.entries(value).map(([locale, item]) => [
+      locale,
+      {
+        locale,
+        title: item.title ?? "",
+        description: item.description ?? "",
+      },
+    ])
+  )
+}
+
+function normalizedTranslated(
+  value: Record<string, TranslationValue>
+): TranslatedDraft {
+  const result: TranslatedDraft = {}
+  for (const [locale, item] of Object.entries(value)) {
+    const title = item.title?.trim() ?? ""
+    const description = item.description?.trim() ?? ""
+    if (title || description) result[locale] = { locale, title, description }
+  }
+  return result
+}
+
+function setTranslationDraft(
+  setter: React.Dispatch<React.SetStateAction<TranslatedDraft>>,
+  locale: string,
+  field: "title" | "description",
+  value: string
+) {
+  setter((current) => ({
+    ...current,
+    [locale]: {
+      locale,
+      title: current[locale]?.title ?? "",
+      description: current[locale]?.description ?? "",
+      [field]: value,
+    },
+  }))
+}
+
+function initialTranslationSourceUrl(content?: AdminContent): string {
+  const metadata = content?.metadata
+  if (!isPlainRecord(metadata)) return ""
+  const imported = isPlainRecord(metadata.import) ? metadata.import : null
+  return cleanImportedUrl(
+    (typeof imported?.sourceUrl === "string" && imported.sourceUrl) ||
+      (typeof metadata.sourcePageUrl === "string" && metadata.sourcePageUrl) ||
+      ""
+  )
+}
+
+function withTranslationSource(
+  metadata: Record<string, unknown>,
+  sourceUrl: string
+): Record<string, unknown> {
+  const imported = isPlainRecord(metadata.import) ? { ...metadata.import } : {}
+  const normalized = cleanImportedUrl(sourceUrl)
+  if (normalized) imported.sourceUrl = normalized
+  else delete imported.sourceUrl
+  if (Object.keys(imported).length) return { ...metadata, import: imported }
+  const result = { ...metadata }
+  delete result.import
+  return result
+}
+
+function missavLocaleLabel(locale: string): string {
+  const labels: Record<string, string> = {
+    th: "ไทย",
+    ja: "日本語",
+    ko: "한국어",
+    zh: "中文",
+    vi: "Tiếng Việt",
+    id: "Bahasa Indonesia",
+    ms: "Bahasa Melayu",
+    tl: "Filipino",
+    de: "Deutsch",
+    fr: "Français",
+    pt: "Português",
+  }
+  return labels[locale] ? `${labels[locale]} (${locale})` : locale
+}
+
 type ContentSavePayload = ContentPayload & {
-  channelIds: string[]
+  studioIds: string[]
+  actressIds: string[]
+  actorIds: string[]
+  directorIds: string[]
   termIds: string[]
   mediaIds: string[]
 }
@@ -1133,13 +1487,13 @@ function changedContentPayload(
   next: ContentSavePayload,
   content: AdminContent
 ): Partial<ContentSavePayload> {
-  const metadata =
-    content.kind === "post" ? {} : editorMetadata(content)
+  const metadata = content.kind === "post" ? {} : editorMetadata(content)
   const initial: ContentSavePayload = {
     kind: content.kind,
     title: nullableText(content.title ?? ""),
     slug: nullableText(content.slug ?? ""),
     description: nullableText(content.description ?? ""),
+    translated: normalizedTranslated(content.translated ?? {}),
     status: content.status,
     visibility: content.visibility,
     metadata,

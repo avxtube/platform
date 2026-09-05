@@ -5,7 +5,10 @@ import {
   authenticateUser,
   requireAdmin,
 } from "../middlewares/user-access.middleware"
-import { importMissavSitemap } from "../services/sitemap-import.service"
+import {
+  buildQueueImportFilter,
+  importMissavSitemap,
+} from "../services/sitemap-import.service"
 
 const router: Router = Router()
 
@@ -15,21 +18,32 @@ router.get(
   "/queue",
   async (req: Request, res: Response, next: NextFunction) => {
     try {
+      const requestedStatus = String(req.query.status ?? "").trim()
+      const status = QUEUE_IMPORT_STATUSES.find(
+        (candidate) => candidate === requestedStatus
+      )
+      const query = String(req.query.q ?? "")
+        .trim()
+        .slice(0, 400)
+      const filter = buildQueueImportFilter(status, query)
       const limit = Math.max(
         1,
-        Math.min(Number.parseInt(String(req.query.limit ?? "50"), 10) || 50, 200)
+        Math.min(
+          Number.parseInt(String(req.query.limit ?? "50"), 10) || 50,
+          200
+        )
       )
       const page = Math.max(
         1,
         Number.parseInt(String(req.query.page ?? "1"), 10) || 1
       )
       const [items, total] = await Promise.all([
-        QueueImportModel.find({})
+        QueueImportModel.find(filter)
           .sort({ createdAt: -1, _id: -1 })
           .skip((page - 1) * limit)
           .limit(limit)
           .lean(),
-        QueueImportModel.countDocuments({}),
+        QueueImportModel.countDocuments(filter),
       ])
       res.status(200).json({
         items,
@@ -43,6 +57,13 @@ router.get(
     }
   }
 )
+
+const QUEUE_IMPORT_STATUSES = [
+  "pending",
+  "processing",
+  "completed",
+  "failed",
+] as const
 
 router.post(
   "/sitemap",

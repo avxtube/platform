@@ -34,7 +34,7 @@ export type ContentRelations = {
     id: string
     name: string
     slug: string
-    taxonomy: "category" | "tag"
+    taxonomy: "category" | "tag" | "label" | "series"
   }>
   contents: Array<{ id: string; title: string; slug: string; kind: "video" }>
 }
@@ -49,7 +49,10 @@ export type Content = {
   title?: string
   slug?: string
   description?: string
-  channelIds?: string[]
+  studioIds?: string[]
+  actressIds?: string[]
+  actorIds?: string[]
+  directorIds?: string[]
   termIds?: string[]
   mediaIds?: string[]
   metadata?: Record<string, unknown>
@@ -80,9 +83,12 @@ export type Video = {
   releaseDate?: string
   category: string
   actors?: VideoChannel[]
+  directors?: VideoChannel[]
   studios?: VideoChannel[]
   categories?: VideoTerm[]
   tags?: VideoTerm[]
+  labels?: VideoTerm[]
+  series?: VideoTerm[]
   playbackUrl?: string
   previewUrl?: string
   player?: {

@@ -9,13 +9,13 @@ import type { PipelineStage } from "mongoose"
 import { getDomainSettings } from "./settings/domain-setting.service"
 
 // One settings snapshot per response, shared by every video/short in that response.
-export async function getContentMappers() {
+export async function getContentMappers(locale?: string) {
   const { domain_static, domain_playlist } = await getDomainSettings()
   return {
     mapVideo: (content: Record<string, unknown>) =>
-      mapContentToVideo(content, domain_static, domain_playlist),
+      mapContentToVideo(content, domain_static, domain_playlist, locale),
     mapShort: (content: Record<string, unknown>) =>
-      mapContentToShort(content, domain_static, domain_playlist),
+      mapContentToShort(content, domain_static, domain_playlist, locale),
   }
 }
 
@@ -37,6 +37,12 @@ export function publicVideoFilter(kind = "video"): Record<string, unknown> {
   return { kind, status: "published", visibility: "public", deletedAt: null }
 }
 
+export function publicVideoListFilter(sort?: unknown): Record<string, unknown> {
+  return sort === "trending"
+    ? { ...publicVideoFilter(), "stats.viewCount": { $gt: 0 } }
+    : publicVideoFilter()
+}
+
 // Join only the requested page, using each related collection's _id index.
 // Never return complete media metadata (tokens, referrers, etc.) to the viewer.
 export function contentLookups(): PipelineStage[] {
@@ -44,10 +50,25 @@ export function contentLookups(): PipelineStage[] {
     {
       $lookup: {
         from: ChannelModel.collection.name,
-        localField: "channelIds",
-        foreignField: "_id",
+        let: {
+          relationIds: {
+            $setUnion: [
+              { $ifNull: ["$studioIds", []] },
+              { $ifNull: ["$actressIds", []] },
+              { $ifNull: ["$actorIds", []] },
+              { $ifNull: ["$directorIds", []] },
+              { $ifNull: ["$channelIds", []] },
+            ],
+          },
+        },
         pipeline: [
-          { $match: { status: "active", deletedAt: null } },
+          {
+            $match: {
+              $expr: { $in: ["$_id", "$$relationIds"] },
+              status: "active",
+              deletedAt: null,
+            },
+          },
           {
             $project: {
               name: 1,
@@ -56,6 +77,7 @@ export function contentLookups(): PipelineStage[] {
               verifiedAt: 1,
               kind: 1,
               "metadata.roles": 1,
+              "metadata.gender": 1,
             },
           },
         ],
@@ -122,10 +144,16 @@ export function contentPagePipeline(
         _id: 1,
         kind: 1,
         title: 1,
+        translated: 1,
         slug: 1,
         description: 1,
         createdAt: 1,
+        updatedAt: 1,
         stats: 1,
+        studioIds: 1,
+        actressIds: 1,
+        actorIds: 1,
+        directorIds: 1,
         channelIds: 1,
         mediaIds: 1,
         termIds: 1,
@@ -165,18 +193,42 @@ export async function findPublicVideo(idOrSlug: string, kind = "video") {
 export function mapContentToVideo(
   content: Record<string, unknown>,
   staticDomain = "",
-  playlistDomain = ""
+  playlistDomain = "",
+  locale?: string
 ): Video {
   const metadata = toRecord(content.metadata)
-  const channels = orderedRelations(content.channels, content.channelIds)
-  const actorChannels = channels.filter((item) => {
-    const roles = stringArray(toRecord(item.metadata).roles)
-    return roles.includes("actor") || item.kind === "person"
-  })
-  const studioChannels = channels.filter((item) => {
-    const roles = stringArray(toRecord(item.metadata).roles)
-    return roles.includes("studio") || item.kind === "organization"
-  })
+  const translation = contentTranslation(content, locale)
+  const legacyChannelIds = stringArray(content.channelIds)
+  const studioIds = stringArray(content.studioIds)
+  const actressIds = stringArray(content.actressIds)
+  const actorIds = stringArray(content.actorIds)
+  const directorIds = stringArray(content.directorIds)
+  const relationIds = [
+    ...studioIds,
+    ...actressIds,
+    ...actorIds,
+    ...directorIds,
+    ...legacyChannelIds,
+  ]
+  const channels = orderedRelations(content.channels, relationIds)
+  const actorChannels =
+    actressIds.length || actorIds.length
+      ? orderedRelations(content.channels, [...actressIds, ...actorIds])
+      : channels.filter((item) => {
+          const roles = stringArray(toRecord(item.metadata).roles)
+          return roles.includes("actor") || item.kind === "person"
+        })
+  const studioChannels = studioIds.length
+    ? orderedRelations(content.channels, studioIds)
+    : channels.filter((item) => {
+        const roles = stringArray(toRecord(item.metadata).roles)
+        return roles.includes("studio") || item.kind === "organization"
+      })
+  const directorChannels = directorIds.length
+    ? orderedRelations(content.channels, directorIds)
+    : channels.filter((item) =>
+        stringArray(toRecord(item.metadata).roles).includes("director")
+      )
   const channel = studioChannels[0] ?? actorChannels[0]
   const media = orderedRelations(content.media, content.mediaIds)
   const playable = media
@@ -201,6 +253,8 @@ export function mapContentToVideo(
   const terms = orderedRelations(content.terms, content.termIds)
   const categories = terms.filter((item) => item.taxonomy === "category")
   const tags = terms.filter((item) => item.taxonomy === "tag")
+  const labels = terms.filter((item) => item.taxonomy === "label")
+  const series = terms.filter((item) => item.taxonomy === "series")
   const category = categories[0]
   const sourceMetadata = toRecord(source?.metadata)
   const releaseDate = optionalDateValue(metadata.releaseDate)
@@ -217,8 +271,14 @@ export function mapContentToVideo(
       : undefined
   return {
     id,
-    title: stringValue(content.title) || stringValue(metadata.dvdId) || id,
-    description: plainText(stringValue(content.description)),
+    title:
+      stringValue(translation.title) ||
+      stringValue(content.title) ||
+      stringValue(metadata.dvdId) ||
+      id,
+    description: plainText(
+      stringValue(translation.description) || stringValue(content.description)
+    ),
     thumbnailUrl: posterUrl,
     durationSeconds:
       numberValue(sourceMetadata.duration) ||
@@ -226,13 +286,18 @@ export function mapContentToVideo(
     viewCount: numberValue(toRecord(content.stats).viewCount),
     likeCount: numberValue(toRecord(content.stats).likeCount),
     dislikeCount: numberValue(toRecord(content.stats).dislikeCount),
-    publishedAt: dateValue(content.createdAt),
+    publishedAt: releaseDate ?? dateValue(content.createdAt),
     ...(releaseDate ? { releaseDate } : {}),
     category: stringValue(category?.name) || "Other",
     actors: actorChannels.map(mapVideoChannel),
+    ...(directorChannels.length
+      ? { directors: directorChannels.map(mapVideoChannel) }
+      : {}),
     studios: studioChannels.map(mapVideoChannel),
     categories: categories.map(mapVideoTerm),
     tags: tags.map(mapVideoTerm),
+    labels: labels.map(mapVideoTerm),
+    series: series.map(mapVideoTerm),
     ...(content.kind === "short" && mediaUrl(source)
       ? { playbackUrl: mediaUrl(source) }
       : {}),
@@ -249,18 +314,34 @@ export function mapContentToVideo(
 export function mapContentToShort(
   content: Record<string, unknown>,
   staticDomain = "",
-  playlistDomain = ""
+  playlistDomain = "",
+  locale?: string
 ): Short {
   const stats = toRecord(content.stats)
   const policy = toRecord(content.metadata).commentPolicy
   return {
-    ...mapContentToVideo(content, staticDomain, playlistDomain),
+    ...mapContentToVideo(content, staticDomain, playlistDomain, locale),
     likeCount: numberValue(stats.likeCount),
     commentCount: numberValue(stats.commentCount),
     shareCount: numberValue(stats.shareCount),
     commentPolicy:
       policy === "disabled" || policy === "review" ? policy : "enabled",
   }
+}
+
+export function normalizeContentLocale(value: unknown): string | undefined {
+  if (typeof value !== "string") return undefined
+  const locale = value.trim().toLowerCase()
+  if (!locale || locale === "en") return undefined
+  return /^[a-z]{2,3}(?:-[a-z0-9]{2,8})?$/.test(locale) ? locale : undefined
+}
+
+function contentTranslation(
+  content: Record<string, unknown>,
+  locale?: string
+): Record<string, unknown> {
+  if (!locale) return {}
+  return toRecord(toRecord(content.translated)[locale])
 }
 
 export async function getPublicVideoCategories() {
@@ -352,6 +433,18 @@ export function plainText(value: string) {
 }
 export function escapeRegExp(value: string) {
   return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")
+}
+export function contentChannelFilter(channelIds: string | string[]) {
+  const condition = Array.isArray(channelIds) ? { $in: channelIds } : channelIds
+  return {
+    $or: [
+      { studioIds: condition },
+      { actressIds: condition },
+      { actorIds: condition },
+      { directorIds: condition },
+      { channelIds: condition },
+    ],
+  }
 }
 function orderedRelations(value: unknown, idsValue: unknown) {
   const ids = stringArray(idsValue)

@@ -4,6 +4,7 @@ import {
   getPublicVideoCategories,
   getPublicContents,
   getContentMappers,
+  normalizeContentLocale,
   publicVideoFilter,
   resolveCategoryId,
 } from "../services/content-video.service"
@@ -12,6 +13,7 @@ const router: Router = Router()
 
 router.get("/", async (req: Request, res: Response, next: NextFunction) => {
   try {
+    const locale = normalizeContentLocale(req.query.locale)
     const requestedCategory =
       typeof req.query.category === "string" ? req.query.category : "all"
     const categoryId = await resolveCategoryId(requestedCategory)
@@ -32,7 +34,7 @@ router.get("/", async (req: Request, res: Response, next: NextFunction) => {
         requestedCategory === "all"
           ? getPublicContents(publicVideoFilter("short"), 10)
           : [],
-        getContentMappers(),
+        getContentMappers(locale),
       ]
     )
     const videos = contents.map(mapVideo)

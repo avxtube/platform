@@ -40,6 +40,7 @@ export function MetadataFields({
   title?: string
 }) {
   const locale = useLocale()
+  const t = useTranslations("admin")
   const groups = useMetadata(scope)
 
   function setField(field: MetadataField, nextValue: unknown) {
@@ -51,7 +52,13 @@ export function MetadataFields({
   }
 
   return groups.map((group) => {
-    const title = titleOverride ?? getMetadataLabel(group.label, locale)
+    const title =
+      titleOverride ??
+      (group.labelKey
+        ? t(group.labelKey)
+        : group.label
+          ? getMetadataLabel(group.label, locale)
+          : group.id)
     const description = group.description
       ? getMetadataLabel(group.description, locale)
       : undefined
@@ -136,7 +143,17 @@ function MetadataFieldControl({
     field.type === "relation-multiple"
   const searchableRelation =
     (field.type === "relation" || field.type === "relation-multiple") &&
-    ["actor", "studio", "category", "tag", "video"].includes(field.relation ?? "")
+    [
+      "actress",
+      "actor",
+      "director",
+      "studio",
+      "category",
+      "tag",
+      "label",
+      "series",
+      "video",
+    ].includes(field.relation ?? "")
 
   return (
     <div className={`space-y-2 ${wide ? "md:col-span-2" : ""}`}>
@@ -210,7 +227,7 @@ function ChannelRelationSelect({
   return (
     <MetadataRelationInput
       id={`metadata-${field.id}`}
-      kind={field.relation as "actor" | "studio" | "category" | "tag" | "video"}
+      kind={field.relation as import("./hooks").RelationKind}
       multiple={multiple}
       value={selectedIds}
       initialOptions={relationOptions}

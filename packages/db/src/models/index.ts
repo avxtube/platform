@@ -10,7 +10,6 @@ export * from "./setting.model"
 // Channel
 export * from "./channel.model"
 export * from "./comment.model"
-export * from "./channel-profile.model"
 export * from "./subscription.model"
 export * from "./term.model"
 export * from "./storage.model"

@@ -9,6 +9,7 @@ import {
   getPublicContents,
   getContentMappers,
   publicVideoFilter,
+  contentChannelFilter,
 } from "../services/content-video.service"
 
 const router: Router = Router()
@@ -38,7 +39,7 @@ router.get("/:handle", async (req, res) => {
   }
   const actor = mapActor(row)
   const contents = await getPublicContents(
-    { ...publicVideoFilter(), channelIds: actor.id },
+    { ...publicVideoFilter(), ...contentChannelFilter(actor.id) },
     48
   )
   const { mapVideo } = await getContentMappers()

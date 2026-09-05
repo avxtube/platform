@@ -24,6 +24,7 @@ import adminMediaRoutes from "./admin-media.routes"
 import adminSettingsRoutes from "./admin-settings.routes"
 import adminImportsRoutes from "./admin-imports.routes"
 import mediaRoutes from "./media.routes"
+import sitemapRoutes from "./sitemap.routes"
 
 const router: Router = Router()
 
@@ -49,6 +50,7 @@ router.use("/admin/media", adminMediaRoutes)
 router.use("/admin/settings", adminSettingsRoutes)
 router.use("/admin/imports", adminImportsRoutes)
 router.use("/media", mediaRoutes)
+router.use("/sitemap", sitemapRoutes)
 
 // Health check endpoint
 router.get("/health", (req, res) => {

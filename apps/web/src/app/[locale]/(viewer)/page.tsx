@@ -19,6 +19,6 @@ export async function generateMetadata({ params }: LocalizedPageProps) {
 
 export default async function Page({ params }: LocalizedPageProps) {
   const { locale } = await params
-  const feed = await getHomeFeed().catch((error) => { console.error("[Home] Failed to fetch feed", error); return { categories: [], videos: [], shorts: [], playlists: [] } })
+  const feed = await getHomeFeed(locale).catch((error) => { console.error("[Home] Failed to fetch feed", error); return { categories: [], videos: [], shorts: [], playlists: [] } })
   return <HomeFeed {...feed} locale={locale}/>
 }

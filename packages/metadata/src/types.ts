@@ -43,7 +43,8 @@ export type MetadataField = {
 
 export type MetadataGroup = {
   id: string
-  label: MetadataLabel
+  label?: MetadataLabel
+  labelKey?: string
   description?: MetadataLabel
   fields: MetadataField[]
 }

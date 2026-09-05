@@ -14,6 +14,8 @@ import {
   Radio,
   Sun,
   Settings,
+  Tags,
+  Users,
   Video,
 } from "lucide-react"
 import { useLocale, useTranslations } from "next-intl"
@@ -206,6 +208,33 @@ function AdminSidebar({ user }: { user: AdminUser }) {
                   </SidebarMenuItem>
                 )
               })}
+              <SidebarMenuItem>
+                <SidebarMenuButton
+                  isActive={pathname.startsWith("/entity")}
+                  tooltip={t("entities.title")}
+                  render={
+                    <Link
+                      href="/entity/category"
+                      onClick={closeMobileSidebar}
+                    />
+                  }
+                >
+                  <Tags />
+                  <span>{t("entities.title")}</span>
+                </SidebarMenuButton>
+              </SidebarMenuItem>
+              <SidebarMenuItem>
+                <SidebarMenuButton
+                  isActive={pathname.startsWith("/channels")}
+                  tooltip={t("channels.title")}
+                  render={
+                    <Link href="/channels" onClick={closeMobileSidebar} />
+                  }
+                >
+                  <Users />
+                  <span>{t("channels.title")}</span>
+                </SidebarMenuButton>
+              </SidebarMenuItem>
             </SidebarMenu>
           </SidebarGroupContent>
         </SidebarGroup>

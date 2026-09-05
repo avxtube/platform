@@ -159,10 +159,10 @@ router.patch(
     try {
       const actor = getRequestActor(res)
       const existingContent = await ContentModel.findOne({
-          _id: req.params.id,
-          deletedAt: { $exists: false },
-        })
-        .select("channelIds termIds mediaIds")
+        _id: req.params.id,
+        deletedAt: { $exists: false },
+      })
+        .select("studioIds actressIds actorIds directorIds termIds mediaIds")
         .lean()
       if (!existingContent) {
         res.status(404).json({ error: "Content not found" })
@@ -170,8 +170,14 @@ router.patch(
       }
       const input = parseContentInput(req.body, true)
       if ("metadata" in input) {
-        if (!("channelIds" in input))
-          input.channelIds = existingContent.channelIds ?? []
+        if (!("studioIds" in input))
+          input.studioIds = existingContent.studioIds ?? []
+        if (!("actressIds" in input))
+          input.actressIds = existingContent.actressIds ?? []
+        if (!("actorIds" in input))
+          input.actorIds = existingContent.actorIds ?? []
+        if (!("directorIds" in input))
+          input.directorIds = existingContent.directorIds ?? []
         if (!("termIds" in input)) input.termIds = existingContent.termIds ?? []
         if (!("mediaIds" in input))
           input.mediaIds = existingContent.mediaIds ?? []
@@ -232,7 +238,12 @@ function parseContentInput(value: unknown, partial: boolean) {
   if (typeof result.slug === "string")
     result.slug = normalizeSlug(result.slug) || undefined
   assignOptionalString(result, value, "description", 20_000)
-  assignStringArray(result, value, "channelIds")
+  if ("translated" in value)
+    result.translated = parseTranslated(value.translated)
+  assignStringArray(result, value, "studioIds")
+  assignStringArray(result, value, "actressIds")
+  assignStringArray(result, value, "actorIds")
+  assignStringArray(result, value, "directorIds")
   assignStringArray(result, value, "mediaIds")
   assignStringArray(result, value, "termIds")
 
@@ -258,6 +269,23 @@ function parseContentInput(value: unknown, partial: boolean) {
   }
 
   return result
+}
+
+function parseTranslated(value: unknown) {
+  if (value === null || value === undefined) return undefined
+  if (!isRecord(value)) throw badRequest("translated must be an object")
+  const translated: Record<string, unknown> = {}
+  for (const [key, raw] of Object.entries(value)) {
+    const locale = key.trim().toLowerCase()
+    if (!/^[a-z]{2,3}(?:-[a-z0-9]{2,8})?$/.test(locale) || !isRecord(raw))
+      throw badRequest("translated contains an invalid locale")
+    const item: Record<string, unknown> = { locale }
+    assignOptionalString(item, raw, "title", 1_000)
+    assignOptionalString(item, raw, "description", 20_000)
+    if (item.title !== undefined || item.description !== undefined)
+      translated[locale] = item
+  }
+  return translated
 }
 
 async function linkContentMedia(contentId: string, value: unknown) {
@@ -354,9 +382,7 @@ function normalizeSlug(value: string) {
 }
 
 function staticContentUrl(domain: string, slug: string, file: string) {
-  return domain && slug
-    ? `//${domain}/${encodeURIComponent(slug)}/${file}`
-    : ""
+  return domain && slug ? `//${domain}/${encodeURIComponent(slug)}/${file}` : ""
 }
 
 function badRequest(message: string) {

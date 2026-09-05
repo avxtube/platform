@@ -26,19 +26,19 @@ export const videoMetadata = defineMetadataGroups([
         step: 1,
       },
       {
-        id: "contentRating",
-        type: "select",
-        label: { en: "Content rating", th: "ระดับเนื้อหา" },
-        options: [
-          { value: "general", label: { en: "General", th: "ทั่วไป" } },
-          { value: "mature", label: { en: "Mature", th: "สำหรับผู้ใหญ่" } },
-        ],
+        id: "country",
+        type: "text",
+        label: { en: "Country", th: "ประเทศ" },
+        placeholder: {
+          en: "ISO country code, e.g. JP",
+          th: "รหัสประเทศ ISO เช่น JP",
+        },
       },
-      {
-        id: "featured",
-        type: "switch",
-        label: { en: "Featured video", th: "วิดีโอแนะนำ" },
-      },
+      // {
+      //   id: "featured",
+      //   type: "switch",
+      //   label: { en: "Featured video", th: "วิดีโอแนะนำ" },
+      // },
     ],
   },
   {
@@ -64,19 +64,31 @@ export const videoMetadata = defineMetadataGroups([
   },
   {
     id: "relations",
-    label: { en: "Relations", th: "ข้อมูลที่เกี่ยวข้อง" },
+    labelKey: "metadataRelations",
     fields: [
       {
-        id: "studioId",
-        type: "relation",
+        id: "studioIds",
+        type: "relation-multiple",
         relation: "studio",
-        label: { en: "Studio", th: "สตูดิโอ" },
+        label: { en: "Studios", th: "สตูดิโอ" },
+      },
+      {
+        id: "actressIds",
+        type: "relation-multiple",
+        relation: "actress",
+        label: { en: "Actresses", th: "นักแสดงหญิง" },
       },
       {
         id: "actorIds",
         type: "relation-multiple",
         relation: "actor",
         label: { en: "Actors", th: "นักแสดง" },
+      },
+      {
+        id: "directorIds",
+        type: "relation-multiple",
+        relation: "director",
+        label: { en: "Directors", th: "ผู้กำกับ" },
       },
       {
         id: "categoryIds",
@@ -90,7 +102,18 @@ export const videoMetadata = defineMetadataGroups([
         relation: "tag",
         label: { en: "Tags", th: "แท็ก" },
       },
-      { id: "label", type: "text", label: { en: "Label", th: "ค่าย" } },
+      {
+        id: "labelIds",
+        type: "relation-multiple",
+        relation: "label",
+        label: { en: "Labels", th: "ค่าย" },
+      },
+      {
+        id: "seriesIds",
+        type: "relation-multiple",
+        relation: "series",
+        label: { en: "Series", th: "ซีรีส์" },
+      },
     ],
   },
 ] satisfies readonly MetadataGroup[])
@@ -121,7 +144,7 @@ export const shortMetadata = defineMetadataGroups([
   },
   {
     id: "relations",
-    label: { en: "Relations", th: "ข้อมูลที่เกี่ยวข้อง" },
+    labelKey: "metadataRelations",
     fields: [
       {
         id: "sourceVideoId",

@@ -1,10 +1,22 @@
 import { notFound } from "next/navigation"
 
 import { ContentForm } from "@/components/content-form"
+import { getWorkerScraperSettings } from "@/lib/admin-api"
 import { isContentKind } from "@/lib/content"
 
-export default async function NewContentPage({ params }: { params: Promise<{ kind: string }> }) {
+export default async function NewContentPage({
+  params,
+}: {
+  params: Promise<{ kind: string }>
+}) {
   const { kind } = await params
   if (!isContentKind(kind)) notFound()
-  return <ContentForm kind={kind} />
+  const workerSettings =
+    kind === "video" ? await getWorkerScraperSettings() : null
+  return (
+    <ContentForm
+      kind={kind}
+      translationLocales={workerSettings?.missav.locales ?? []}
+    />
+  )
 }

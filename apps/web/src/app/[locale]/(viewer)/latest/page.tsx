@@ -4,12 +4,28 @@ import { Clock3 } from "lucide-react"
 import { getTranslations } from "next-intl/server"
 
 import { VideoGrid } from "@/components/video"
+import { createPageMetadata } from "@/i18n/metadata"
 
 import { LatestPager } from "./latest-pager"
 
 const PAGE_SIZE = 24
 
 export const dynamic = "force-dynamic"
+
+export async function generateMetadata({
+  params,
+}: {
+  params: Promise<{ locale: Locale }>
+}) {
+  const { locale } = await params
+  const t = await getTranslations({ locale, namespace: "video.latest" })
+  return createPageMetadata({
+    locale,
+    pathname: "/latest",
+    title: t("title"),
+    description: t("description"),
+  })
+}
 
 export default async function LatestVideosPage({
   params,
@@ -63,11 +79,7 @@ export default async function LatestVideosPage({
       )}
 
       {pageCount > 1 ? (
-        <LatestPager
-          page={page}
-          pageCount={pageCount}
-          pageSize={PAGE_SIZE}
-        />
+        <LatestPager page={page} pageCount={pageCount} pageSize={PAGE_SIZE} />
       ) : null}
     </div>
   )

@@ -37,11 +37,19 @@ export function channelPagePipeline(
     {
       $lookup: {
         from: ContentModel.collection.name,
-        localField: "_id",
-        foreignField: "channelIds",
+        let: { channelId: "$_id" },
         pipeline: [
           {
             $match: {
+              $expr: {
+                $or: [
+                  { $in: ["$$channelId", { $ifNull: ["$studioIds", []] }] },
+                  { $in: ["$$channelId", { $ifNull: ["$actressIds", []] }] },
+                  { $in: ["$$channelId", { $ifNull: ["$actorIds", []] }] },
+                  { $in: ["$$channelId", { $ifNull: ["$directorIds", []] }] },
+                  { $in: ["$$channelId", { $ifNull: ["$channelIds", []] }] },
+                ],
+              },
               ...publicVideoFilter(),
               kind: { $in: ["video", "short", "post"] },
             },

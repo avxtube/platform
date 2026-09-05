@@ -15,7 +15,16 @@ export function useMetadata(scope: MetadataScope) {
   )
 }
 
-export type RelationKind = "actor" | "studio" | "category" | "tag" | "video"
+export type RelationKind =
+  | "actress"
+  | "actor"
+  | "director"
+  | "studio"
+  | "category"
+  | "tag"
+  | "label"
+  | "series"
+  | "video"
 
 export type RelationSearchOption = {
   id: string
@@ -31,7 +40,7 @@ type ChannelsResponse = {
     name: string
     handle: string
     avatarUrl: string | null
-    kind: "actor" | "studio"
+    kind: "person" | "organization"
   }>
 }
 type TermsResponse = {
@@ -39,7 +48,7 @@ type TermsResponse = {
     id: string
     name: string
     slug: string
-    taxonomy: "category" | "tag"
+    taxonomy: "category" | "tag" | "label" | "series"
   }>
 }
 type ContentsResponse = {
@@ -78,7 +87,9 @@ export function useRelationOptions(
       setSearching(true)
 
       try {
-        const isChannel = kind === "actor" || kind === "studio"
+        const isChannel = ["actress", "actor", "director", "studio"].includes(
+          kind
+        )
         const isContent = kind === "video"
         params.set(isChannel || isContent ? "kind" : "taxonomy", kind)
         const requestedIds = params.get("ids")?.split(",").filter(Boolean) ?? []

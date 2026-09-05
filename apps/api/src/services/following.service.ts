@@ -10,6 +10,7 @@ import {
   getPublicContents,
   isRecord,
   publicVideoFilter,
+  contentChannelFilter,
   stringArray,
   stringValue,
 } from "./content-video.service"
@@ -28,7 +29,7 @@ export async function getUserFollowingFeed(
   if (!channelIds.length) return { items: [], nextCursor: null, total: 0 }
   const filter = {
     ...publicVideoFilter(),
-    channelIds: { $in: channelIds },
+    ...contentChannelFilter(channelIds),
   }
   const [contents, total, { mapVideo }] = await Promise.all([
     getPublicContents(filter, Math.min(Math.max(limit, 1), 20)),
@@ -73,7 +74,34 @@ export async function getUserFollowingProfiles(
               pipeline: [
                 {
                   $match: {
-                    $expr: { $in: ["$$channelId", "$channelIds"] },
+                    $expr: {
+                      $or: [
+                        {
+                          $in: ["$$channelId", { $ifNull: ["$studioIds", []] }],
+                        },
+                        {
+                          $in: [
+                            "$$channelId",
+                            { $ifNull: ["$actressIds", []] },
+                          ],
+                        },
+                        {
+                          $in: ["$$channelId", { $ifNull: ["$actorIds", []] }],
+                        },
+                        {
+                          $in: [
+                            "$$channelId",
+                            { $ifNull: ["$directorIds", []] },
+                          ],
+                        },
+                        {
+                          $in: [
+                            "$$channelId",
+                            { $ifNull: ["$channelIds", []] },
+                          ],
+                        },
+                      ],
+                    },
                     kind: "live",
                     status: "published",
                     visibility: "public",

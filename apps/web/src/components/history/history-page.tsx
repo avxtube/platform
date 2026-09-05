@@ -10,17 +10,11 @@ import {
   CarouselNext,
   CarouselPrevious,
 } from "@workspace/ui/components"
-import {
-  EllipsisVertical,
-  Pause,
-  Play,
-  Search,
-  Settings,
-  Trash2,
-} from "lucide-react"
+import { EllipsisVertical, Pause, Search, Settings, Trash2 } from "lucide-react"
 import { useTranslations } from "next-intl"
 import * as React from "react"
 
+import { VideoListCard } from "@/components/video"
 import { Link } from "@/i18n/navigation"
 
 type Filter = "all" | HistoryContentType
@@ -261,47 +255,24 @@ function HistoryVideoRow({
 }) {
   const t = useTranslations("video.historyPage")
   return (
-    <article className="group flex gap-4 py-4">
-      <Link
-        href={`/watch/${entry.content.id}`}
-        className="relative aspect-video w-44 shrink-0 overflow-hidden rounded-xl bg-muted sm:w-60"
-      >
-        <img
-          src={entry.content.thumbnailUrl}
-          alt=""
-          className="size-full object-cover transition-transform group-hover:scale-[1.02]"
-        />
-        <span className="absolute top-1/2 left-1/2 grid size-10 -translate-x-1/2 -translate-y-1/2 place-items-center rounded-full bg-black/60 text-white opacity-0 group-hover:opacity-100">
-          <Play className="size-4 fill-current" />
-        </span>
-        <span className="absolute right-2 bottom-2 rounded bg-black/80 px-1.5 py-0.5 text-xs font-semibold text-white">
-          {formatDuration(entry.content.durationSeconds)}
-        </span>
-      </Link>
-      <div className="min-w-0 flex-1">
-        <div className="flex items-start gap-2">
-          <Link href={`/watch/${entry.content.id}`} className="min-w-0 flex-1">
-            <h3 className="line-clamp-2 font-semibold group-hover:text-primary">
-              {entry.content.title}
-            </h3>
-          </Link>
+    <div className="py-4">
+      <VideoListCard
+        video={entry.content}
+        viewsLabel={t("views", {
+          count: formatNumber(entry.content.viewCount, locale),
+        })}
+        action={
           <button
             type="button"
             onClick={() => onRemove(entry.id)}
             aria-label={t("remove")}
+            className="grid size-8 shrink-0 place-items-center rounded-full text-muted-foreground hover:bg-muted hover:text-foreground"
           >
-            <EllipsisVertical className="size-5" />
+            <EllipsisVertical className="size-4" />
           </button>
-        </div>
-        <p className="mt-2 text-xs text-muted-foreground">
-          {entry.content.channel ? `${entry.content.channel.name} • ` : ""}
-          {t("views", { count: formatNumber(entry.content.viewCount, locale) })}
-        </p>
-        <p className="mt-3 line-clamp-2 hidden text-sm text-muted-foreground sm:block">
-          {entry.content.description}
-        </p>
-      </div>
-    </article>
+        }
+      />
+    </div>
   )
 }
 
@@ -310,12 +281,4 @@ function formatNumber(value: number, locale: string) {
     notation: "compact",
     maximumFractionDigits: 1,
   }).format(value)
-}
-function formatDuration(seconds: number) {
-  const hours = Math.floor(seconds / 3600)
-  const minutes = Math.floor((seconds % 3600) / 60)
-  const rest = seconds % 60
-  return hours
-    ? `${hours}:${String(minutes).padStart(2, "0")}:${String(rest).padStart(2, "0")}`
-    : `${minutes}:${String(rest).padStart(2, "0")}`
 }

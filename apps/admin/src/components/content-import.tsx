@@ -11,6 +11,7 @@ export type ImportedVideoData = {
   slug?: string
   content?: string
   code?: string
+  country?: unknown
   duration?: number
   releaseDate?: string
   m3u8Url?: string
@@ -18,10 +19,13 @@ export type ImportedVideoData = {
   trailer?: string
   sourceUrl?: string
   actresses?: unknown
+  actors?: unknown
   makers?: unknown
   directors?: unknown
   genres?: unknown
+  tags?: unknown
   labels?: unknown
+  series?: unknown
   video?: unknown
   thumbnail?: unknown
 }
@@ -37,10 +41,12 @@ export type VideoImportResult = {
 export function ContentImport({
   disabled,
   onImported,
+  onUrlChange,
   successMessage,
 }: {
   disabled?: boolean
   onImported: (result: VideoImportResult) => void | Promise<void>
+  onUrlChange?: (url: string) => void
   successMessage?: string
 }) {
   const t = useTranslations("admin")
@@ -90,7 +96,10 @@ export function ContentImport({
       <div className="flex gap-2">
         <Input
           value={url}
-          onChange={(event) => setUrl(event.target.value)}
+          onChange={(event) => {
+            setUrl(event.target.value)
+            onUrlChange?.(event.target.value)
+          }}
           onKeyDown={(event) => {
             if (event.key === "Enter") {
               event.preventDefault()

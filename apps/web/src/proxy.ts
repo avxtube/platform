@@ -68,12 +68,8 @@ export async function proxy(req: NextRequest) {
     matchesRoute(routePathName, route)
   )
   const isLocalizedRoute = !isProtectedRoute
-  const cookieLocale = normalizeLocale(
-    req.cookies.get(localeCookieName)?.value
-  )
-  const browserLocale = getBrowserLocale(
-    req.headers.get("accept-language")
-  )
+  const cookieLocale = normalizeLocale(req.cookies.get(localeCookieName)?.value)
+  const browserLocale = getBrowserLocale(req.headers.get("accept-language"))
   const dashboardLocale = cookieLocale ?? browserLocale ?? defaultLocale
 
   // Public pages do not make routing decisions from the session.
@@ -226,11 +222,7 @@ function getRoutingDecision(
 
   // Restrict access to Protected Routes for unauthenticated users
   if (!session && isProtectedRoute) {
-    return redirectTo(
-      accountsUrl,
-      localizedPath("/login", locale),
-      currentUrl
-    )
+    return redirectTo(accountsUrl, localizedPath("/login", locale), currentUrl)
   }
 
   // Redirect authenticated users away from Auth Routes (e.g. /login)
@@ -389,6 +381,6 @@ function appendInitialLocaleCookie(
 export const config = {
   matcher: [
     "/api/auth/error",
-    "/((?!api|assets|_next|__nextjs|favicon.ico|sitemap.xml|robots.txt|manifest.webmanifest|opengraph-image|twitter-image|icon|apple-icon|.*\\.svg|.*\\.png|.*\\.jpg|.*\\.jpeg|.*\\.gif|.*\\.webp|.*\\.ico|.*\\.json|\\.well-known).*)",
+    "/((?!api|assets|_next|__nextjs|favicon.ico|sitemap.xml|sitemaps|robots.txt|manifest.webmanifest|opengraph-image|twitter-image|icon|apple-icon|.*\\.svg|.*\\.png|.*\\.jpg|.*\\.jpeg|.*\\.gif|.*\\.webp|.*\\.ico|.*\\.xml|.*\\.json|\\.well-known).*)",
   ],
 }

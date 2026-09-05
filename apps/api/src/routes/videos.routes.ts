@@ -9,7 +9,9 @@ import {
   findPublicVideo,
   getPublicContents,
   getContentMappers,
+  normalizeContentLocale,
   publicVideoFilter,
+  publicVideoListFilter,
   stringValue,
   contentLookups,
 } from "../services/content-video.service"
@@ -37,7 +39,7 @@ router.get("/", async (req: Request, res: Response, next: NextFunction) => {
       req.query.sort === "trending"
         ? { "stats.viewCount": -1, createdAt: -1, _id: -1 }
         : { createdAt: -1, _id: -1 }
-    const filter = publicVideoFilter()
+    const filter = publicVideoListFilter(req.query.sort)
     const [contents, total, { mapVideo }] = await Promise.all([
       getPublicContents(filter, limit, cursor, sort),
       ContentModel.countDocuments(filter),
@@ -97,11 +99,7 @@ router.patch(
       let interaction
       if ("reaction" in body) {
         const reaction = body.reaction
-        if (
-          reaction !== null &&
-          reaction !== "like" &&
-          reaction !== "dislike"
-        )
+        if (reaction !== null && reaction !== "like" && reaction !== "dislike")
           throw invalid("reaction must be like, dislike, or null")
         interaction = await setVideoReaction(userId, contentId, reaction)
       } else if (typeof body.watchLater === "boolean") {
@@ -138,10 +136,7 @@ router.post(
         res.status(404).json({ error: "Video not found" })
         return
       }
-      await markVideoWatched(
-        getRequestActor(res).id,
-        stringValue(content._id)
-      )
+      await markVideoWatched(getRequestActor(res).id, stringValue(content._id))
       res.status(204).end()
     } catch (error) {
       next(error)
@@ -214,7 +209,8 @@ router.post(
         return
       }
       const body = isRecord(req.body) ? req.body : {}
-      const message = typeof body.message === "string" ? body.message.trim() : ""
+      const message =
+        typeof body.message === "string" ? body.message.trim() : ""
       if (!message || message.length > 2_000)
         throw invalid("Comment must contain between 1 and 2000 characters")
       const parentId =
@@ -238,17 +234,20 @@ router.get(
   "/:id",
   async (req: Request<{ id: string }>, res: Response, next: NextFunction) => {
     try {
+      const locale = normalizeContentLocale(req.query.locale)
       const content = await findPublicVideo(req.params.id)
       if (!content) {
         res.status(404).json({ error: "Video not found" })
         return
       }
-      const relatedContents = await ContentModel.aggregate<Record<string, unknown>>([
+      const relatedContents = await ContentModel.aggregate<
+        Record<string, unknown>
+      >([
         { $match: { ...publicVideoFilter(), _id: { $ne: content._id } } },
         { $sample: { size: 20 } },
         ...contentLookups(),
       ]).exec()
-      const { mapVideo } = await getContentMappers()
+      const { mapVideo } = await getContentMappers(locale)
       const video = mapVideo(content)
       const relatedVideos = relatedContents.map(mapVideo)
       const comments = await getVideoComments(stringValue(content._id), 0, 10)

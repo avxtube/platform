@@ -14,6 +14,7 @@ import {
   escapeRegExp,
   getPublicContents,
   getContentMappers,
+  normalizeContentLocale,
   publicVideoFilter,
   stringValue,
 } from "../services/content-video.service"
@@ -21,6 +22,7 @@ import {
 const router: Router = Router()
 router.get("/", async (req, res) => {
   const q = stringValue(req.query.q).slice(0, 200)
+  const locale = normalizeContentLocale(req.query.locale)
   const type = stringValue(req.query.type) || "all"
   const filter: Record<string, unknown> = {
     ...publicVideoFilter(),
@@ -62,6 +64,11 @@ router.get("/", async (req, res) => {
     filter.$or = [
       { title: pattern },
       { description: pattern },
+      translatedTextCondition(pattern),
+      { studioIds: { $in: channelIds } },
+      { actressIds: { $in: channelIds } },
+      { actorIds: { $in: channelIds } },
+      { directorIds: { $in: channelIds } },
       { channelIds: { $in: channelIds } },
       { termIds: { $in: termIds } },
     ]
@@ -120,10 +127,8 @@ router.get("/", async (req, res) => {
     await Promise.all([
       getPublicContents(filter, 50, 0, sort),
       ContentModel.countDocuments(filter),
-      type === "all" && q
-        ? getPublicChannels(profileSearch, 8)
-        : [],
-      getContentMappers(),
+      type === "all" && q ? getPublicChannels(profileSearch, 8) : [],
+      getContentMappers(locale),
     ])
   res.json({
     videos: contents.filter((item) => item.kind === "video").map(mapVideo),
@@ -133,4 +138,33 @@ router.get("/", async (req, res) => {
     total: totalContents + actors.length,
   })
 })
+
+function translatedTextCondition(pattern: RegExp) {
+  return {
+    $expr: {
+      $anyElementTrue: {
+        $map: {
+          input: { $objectToArray: { $ifNull: ["$translated", {}] } },
+          as: "translation",
+          in: {
+            $or: [
+              {
+                $regexMatch: {
+                  input: { $ifNull: ["$$translation.v.title", ""] },
+                  regex: pattern,
+                },
+              },
+              {
+                $regexMatch: {
+                  input: { $ifNull: ["$$translation.v.description", ""] },
+                  regex: pattern,
+                },
+              },
+            ],
+          },
+        },
+      },
+    },
+  }
+}
 export default router

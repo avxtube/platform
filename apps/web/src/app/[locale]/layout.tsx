@@ -6,27 +6,25 @@ import "@workspace/ui/styles/flags.css"
 
 import { ThemeProvider } from "@/components/theme-provider"
 import { IntlProvider } from "@/components/i18n/intl-provider"
-import { cn } from "@workspace/ui/lib/utils";
-import { hasLocale } from "next-intl";
-import { routing } from "@/i18n/routing";
-import { notFound } from "next/navigation";
-import { getMessages, setRequestLocale } from "next-intl/server";
-import { defaultTimeZone, localeDirections, localeTags } from "@workspace/i18n";
-import { Metadata } from "next";
-import { selectClientMessages } from "@/i18n/client-messages";
-
+import { cn } from "@workspace/ui/lib/utils"
+import { hasLocale } from "next-intl"
+import { routing } from "@/i18n/routing"
+import { notFound } from "next/navigation"
+import { getMessages, setRequestLocale } from "next-intl/server"
+import { defaultTimeZone, localeDirections, localeTags } from "@workspace/i18n"
+import { Metadata } from "next"
+import { selectClientMessages } from "@/i18n/client-messages"
 
 const geist = Geist({ subsets: ["latin"], variable: "--font-sans" })
 
 export const metadata: Metadata = {
-  metadataBase: new URL("https://vdohide.com"),
+  metadataBase: new URL("https://avxtube.org"),
 }
 
 const fontMono = Geist_Mono({
   subsets: ["latin"],
   variable: "--font-mono",
 })
-
 
 export default async function RootLayout({
   children,

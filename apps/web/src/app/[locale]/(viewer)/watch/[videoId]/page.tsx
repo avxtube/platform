@@ -1,9 +1,15 @@
 import { notFound } from "next/navigation"
+import { cache } from "react"
 import type { Locale } from "@workspace/i18n/config"
 
-import { createPageMetadata } from "@/i18n/metadata"
+import {
+  createPageMetadata,
+  localizedPageUrl,
+  serializeJsonLd,
+} from "@/i18n/metadata"
+import { videoStructuredData } from "@/lib/structured-data"
 import { WatchExperience } from "@/components/watch/watch-experience"
-import { getPlaylist, getVideo, getWatchData } from "@workspace/services/queries/video"
+import { getPlaylist, getWatchData } from "@workspace/services/queries/video"
 
 type VideoPageProps = {
   params: Promise<{ locale: Locale; videoId: string }>
@@ -12,24 +18,53 @@ type VideoPageProps = {
 
 export const dynamic = "force-dynamic"
 
+const getWatchPageData = cache((videoId: string, locale: Locale) =>
+  getWatchData(videoId, locale)
+)
+
 export async function generateMetadata({ params }: VideoPageProps) {
   const { locale, videoId } = await params
-  const video = await getVideo(videoId).catch(() => null)
+  const data = await getWatchPageData(videoId, locale).catch(() => null)
 
-  if (!video) return {}
+  if (!data) return {}
 
   return createPageMetadata({
     locale,
     pathname: `/watch/${videoId}`,
-    title: video.title,
-    description: video.description,
+    title: data.video.title,
+    description: data.video.description,
+    image: data.video.thumbnailUrl,
+    video: data.video.previewUrl,
+    openGraphType: "video.other",
   })
 }
 
-export default async function VideoPage({ params, searchParams }: VideoPageProps) {
+export default async function VideoPage({
+  params,
+  searchParams,
+}: VideoPageProps) {
   const [{ locale, videoId }, query] = await Promise.all([params, searchParams])
   const listId = Array.isArray(query.list) ? query.list[0] : query.list
-  const [data, playlist] = await Promise.all([getWatchData(videoId).catch(() => null), listId ? getPlaylist(listId).catch(() => null) : null])
+  const [data, playlist] = await Promise.all([
+    getWatchPageData(videoId, locale).catch(() => null),
+    listId ? getPlaylist(listId).catch(() => null) : null,
+  ])
   if (!data) notFound()
-  return <WatchExperience key={data.video.id} data={data} locale={locale} playlist={playlist}/>
+  const pageUrl = localizedPageUrl(locale, `/watch/${videoId}`)
+  return (
+    <>
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{
+          __html: serializeJsonLd(videoStructuredData(data.video, pageUrl)),
+        }}
+      />
+      <WatchExperience
+        key={data.video.id}
+        data={data}
+        locale={locale}
+        playlist={playlist}
+      />
+    </>
+  )
 }

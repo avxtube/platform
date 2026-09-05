@@ -16,11 +16,18 @@ export type AdminContent = {
   title?: string
   slug?: string
   description?: string
-  studioId?: string
+  translated?: Record<
+    string,
+    { locale?: string; title?: string; description?: string }
+  >
+  studioIds?: string[]
+  actressIds?: string[]
+  actorIds?: string[]
+  directorIds?: string[]
+  /** Legacy relation IDs, read only while old content is being migrated. */
   channelIds?: string[]
   mediaIds?: string[]
   termIds?: string[]
-  actorIds?: string[]
   thumbnailUrl?: string
   metadata?: Record<string, unknown>
   relations?: ContentRelations

@@ -1,12 +1,15 @@
 export type PendingChannel = {
   key: string
-  kind: "actor" | "studio"
+  kind: "actress" | "actor" | "director" | "studio"
   name: string
 }
 
 const pendingPrefix = "__pending_channel__:"
 
-export function createPendingChannelValue(kind: PendingChannel["kind"], name: string) {
+export function createPendingChannelValue(
+  kind: PendingChannel["kind"],
+  name: string
+) {
   return `${pendingPrefix}${kind}:${encodeURIComponent(name.trim().replace(/\s+/g, " "))}`
 }
 
@@ -16,7 +19,13 @@ export function parsePendingChannelValue(value: string): PendingChannel | null {
   const separator = remainder.indexOf(":")
   if (separator < 0) return null
   const kind = remainder.slice(0, separator)
-  if (kind !== "actor" && kind !== "studio") return null
+  if (
+    kind !== "actress" &&
+    kind !== "actor" &&
+    kind !== "director" &&
+    kind !== "studio"
+  )
+    return null
 
   try {
     const name = decodeURIComponent(remainder.slice(separator + 1)).trim()
@@ -35,12 +44,19 @@ export function collectPendingChannels(value: unknown) {
   return [...found.values()]
 }
 
-export function replacePendingChannels(value: unknown, resolved: Map<string, string>): unknown {
+export function replacePendingChannels(
+  value: unknown,
+  resolved: Map<string, string>
+): unknown {
   if (typeof value === "string") return resolved.get(value) ?? value
-  if (Array.isArray(value)) return value.map((item) => replacePendingChannels(item, resolved))
+  if (Array.isArray(value))
+    return value.map((item) => replacePendingChannels(item, resolved))
   if (!value || typeof value !== "object") return value
   return Object.fromEntries(
-    Object.entries(value).map(([key, item]) => [key, replacePendingChannels(item, resolved)])
+    Object.entries(value).map(([key, item]) => [
+      key,
+      replacePendingChannels(item, resolved),
+    ])
   )
 }
 

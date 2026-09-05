@@ -1,4 +1,3 @@
-/* eslint-disable @next/next/no-img-element */
 "use client"
 
 import type { Playlist, Video, WatchData } from "@workspace/core/types"
@@ -8,6 +7,7 @@ import { useTranslations } from "next-intl"
 import * as React from "react"
 
 import { FollowActorButton } from "@/components/actor/follow-actor-button"
+import { VideoListCard } from "@/components/video"
 import { Link } from "@/i18n/navigation"
 
 import { VideoActions } from "./video-actions"
@@ -55,10 +55,10 @@ export function WatchExperience({
   }).format(video.viewCount)
   const releaseDate = video.releaseDate
     ? new Intl.DateTimeFormat(locale, {
-    day: "numeric",
-    month: "long",
-    year: "numeric",
-    timeZone: "Asia/Bangkok",
+        day: "numeric",
+        month: "long",
+        year: "numeric",
+        timeZone: "Asia/Bangkok",
       }).format(new Date(video.releaseDate))
     : null
   const channelHref = video.channel
@@ -222,7 +222,7 @@ export function WatchExperience({
       </div>
       <div className="divide-y sm:space-y-4 sm:divide-y-0">
         {related.map((item) => (
-          <RelatedVideoCard
+          <VideoListCard
             key={item.id}
             video={item}
             viewsLabel={t("views", {
@@ -270,6 +270,15 @@ function VideoDetails({ video }: { video: Video }) {
       })),
     },
     {
+      key: "directors",
+      label: t("detailsDirectors"),
+      items: (video.directors ?? []).map((item) => ({
+        id: item.id,
+        label: item.name,
+        href: `/channel/${item.handle.replace(/^@/, "")}`,
+      })),
+    },
+    {
       key: "studios",
       label: t("detailsStudios"),
       items: (video.studios ?? []).map((item) => ({
@@ -291,6 +300,24 @@ function VideoDetails({ video }: { video: Video }) {
       key: "tags",
       label: t("detailsTags"),
       items: (video.tags ?? []).map((item) => ({
+        id: item.id,
+        label: item.name,
+        href: `/search?q=${encodeURIComponent(item.name)}`,
+      })),
+    },
+    {
+      key: "labels",
+      label: t("detailsLabels"),
+      items: (video.labels ?? []).map((item) => ({
+        id: item.id,
+        label: item.name,
+        href: `/search?q=${encodeURIComponent(item.name)}`,
+      })),
+    },
+    {
+      key: "series",
+      label: t("detailsSeries"),
+      items: (video.series ?? []).map((item) => ({
         id: item.id,
         label: item.name,
         href: `/search?q=${encodeURIComponent(item.name)}`,
@@ -321,103 +348,10 @@ function VideoDetails({ video }: { video: Video }) {
   )
 }
 
-function RelatedVideoCard({
-  video,
-  viewsLabel,
-}: {
-  video: Video
-  viewsLabel: string
-}) {
-  const previewRef = React.useRef<HTMLVideoElement>(null)
-  const [previewActive, setPreviewActive] = React.useState(false)
-  const [previewPlaying, setPreviewPlaying] = React.useState(false)
-  const [previewFailed, setPreviewFailed] = React.useState(false)
-  const canPreview = Boolean(video.previewUrl) && !previewFailed
-
-  React.useEffect(() => {
-    const player = previewRef.current
-    if (!player) return
-    if (!previewActive) {
-      player.pause()
-      player.currentTime = 0
-      return
-    }
-    player.currentTime = 0
-    void player.play().catch(() => setPreviewPlaying(false))
-  }, [previewActive])
-
-  return (
-    <Link
-      href={`/watch/${video.id}`}
-      onPointerEnter={(event) => {
-        if (event.pointerType === "mouse" && canPreview)
-          setPreviewActive(true)
-      }}
-      onPointerLeave={() => {
-        setPreviewPlaying(false)
-        setPreviewActive(false)
-      }}
-      className="group block bg-background sm:flex sm:gap-3"
-    >
-      <div className="relative aspect-video w-full shrink-0 overflow-hidden bg-muted sm:w-40 sm:rounded-lg">
-        <img
-          src={video.thumbnailUrl}
-          alt=""
-          loading="lazy"
-          className={`size-full object-cover transition-[transform,opacity] duration-200 group-hover:scale-105 ${previewPlaying ? "opacity-0" : "opacity-100"}`}
-        />
-        {canPreview ? (
-          <video
-            ref={previewRef}
-            src={video.previewUrl}
-            muted
-            loop
-            playsInline
-            preload="none"
-            poster={video.thumbnailUrl}
-            aria-hidden="true"
-            onPlaying={() => setPreviewPlaying(true)}
-            onError={() => {
-              setPreviewFailed(true)
-              setPreviewActive(false)
-              setPreviewPlaying(false)
-            }}
-            className={`absolute inset-0 size-full object-cover transition-opacity duration-200 ${previewPlaying ? "opacity-100" : "opacity-0"}`}
-          />
-        ) : null}
-        <span className="absolute right-2 bottom-2 rounded bg-black/80 px-1.5 py-0.5 text-xs font-semibold text-white">
-          {formatDuration(video.durationSeconds)}
-        </span>
-      </div>
-      <div className="min-w-0 p-3 sm:p-0">
-        <h3 className="line-clamp-2 text-sm font-semibold">{video.title}</h3>
-        {video.channel ? (
-          <p className="mt-1 text-xs text-muted-foreground">
-            {video.channel.name}
-          </p>
-        ) : null}
-        <p className="text-xs text-muted-foreground">{viewsLabel}</p>
-      </div>
-    </Link>
-  )
-}
-
 function initials(name: string) {
   return name
     .split(/\s+/)
     .map((part) => part[0])
     .join("")
     .slice(0, 2)
-}
-function formatDuration(seconds: number) {
-  const totalSeconds = Math.max(
-    0,
-    Math.floor(Number.isFinite(seconds) ? seconds : 0)
-  )
-  const hours = Math.floor(totalSeconds / 3600)
-  const minutes = Math.floor((totalSeconds % 3600) / 60)
-  const rest = totalSeconds % 60
-  return hours
-    ? `${hours}:${String(minutes).padStart(2, "0")}:${String(rest).padStart(2, "0")}`
-    : `${minutes}:${String(rest).padStart(2, "0")}`
 }

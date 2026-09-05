@@ -1,7 +1,7 @@
 import { getCurrentUser } from "@workspace/auth/server"
 import { UserRole } from "@workspace/core/enums"
 import { type NextRequest, NextResponse } from "next/server"
-import { getDomainSettings } from "@/lib/admin-api"
+import { getDomainSettings, getWorkerScraperSettings } from "@/lib/admin-api"
 import { scraperRequestUrl } from "@/lib/scraper-url"
 
 const allowedRoles = new Set<string>([
@@ -29,8 +29,26 @@ export async function GET(request: NextRequest) {
 
   try {
     // Reads the protected API (and database) with no-store on every import.
-    const settings = await getDomainSettings()
-    const scraperUrl = scraperRequestUrl(settings.url_scraping, targetUrl)
+    const requestedLocale = request.nextUrl.searchParams.get("locale")?.trim()
+    const [settings, workerSettings] = await Promise.all([
+      getDomainSettings(),
+      requestedLocale ? getWorkerScraperSettings() : Promise.resolve(null),
+    ])
+    if (
+      requestedLocale &&
+      !workerSettings?.missav.locales.some(
+        (locale) => locale === requestedLocale
+      )
+    )
+      return NextResponse.json(
+        { error: "locale is not enabled in Worker Scraper settings" },
+        { status: 400 }
+      )
+    const scraperUrl = scraperRequestUrl(
+      settings.url_scraping,
+      targetUrl,
+      requestedLocale
+    )
     if (!scraperUrl)
       return NextResponse.json(
         { error: "Configure Scraping in Settings → Domains before importing" },
@@ -45,7 +63,7 @@ export async function GET(request: NextRequest) {
     if (!response.ok || !body || typeof body !== "object") {
       return NextResponse.json(
         { error: `Scraper returned ${response.status}` },
-        { status: 502 }
+        { status: response.status === 404 ? 404 : 502 }
       )
     }
     return NextResponse.json(body)

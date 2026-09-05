@@ -3,6 +3,7 @@ import { afterEach, mock, test } from "node:test"
 import { ChannelModel, MediaModel, TermModel } from "@workspace/db/models"
 import {
   channelPositions,
+  channelHandleBase,
   prepareContentReferences,
   resolveContentRelations,
 } from "../src/services/content-relations.service"
@@ -24,8 +25,11 @@ const content: AdminContent = {
   createdBy: "admin",
   createdAt: "",
   updatedAt: "",
-  channelIds: ["studio", "actor2", "actor1", "director"],
-  termIds: ["cat2", "cat1", "tag"],
+  studioIds: ["studio"],
+  actressIds: ["actor2"],
+  actorIds: ["actor1"],
+  directorIds: ["director"],
+  termIds: ["cat2", "cat1", "tag", "label", "series"],
   mediaIds: ["poster", "trailer", "v720", "v360", "sprite"],
   metadata: { dvdId: "test", custom: { keep: true } },
   relations: {
@@ -44,7 +48,7 @@ const content: AdminContent = {
         handle: "two",
         avatarUrl: null,
         kind: "person",
-        positions: ["actors"],
+        positions: ["actresses"],
       },
       {
         id: "actor1",
@@ -67,6 +71,8 @@ const content: AdminContent = {
       { id: "cat2", name: "Two", slug: "two", taxonomy: "category" },
       { id: "cat1", name: "One", slug: "one", taxonomy: "category" },
       { id: "tag", name: "Tag", slug: "tag", taxonomy: "tag" },
+      { id: "label", name: "Label", slug: "label", taxonomy: "label" },
+      { id: "series", name: "Series", slug: "series", taxonomy: "series" },
     ],
     media: [
       {
@@ -113,22 +119,29 @@ const content: AdminContent = {
 
 test("editor hydrates channels, terms and media into their API-defined slots", () => {
   const metadata = editorMetadata(content)
-  assert.equal(metadata.studioId, "studio")
-  assert.deepEqual(metadata.actorIds, ["actor2", "actor1"])
+  assert.deepEqual(metadata.studioIds, ["studio"])
+  assert.deepEqual(metadata.actressIds, ["actor2"])
+  assert.deepEqual(metadata.actorIds, ["actor1"])
+  assert.deepEqual(metadata.directorIds, ["director"])
   assert.deepEqual(metadata.categoryIds, ["cat2", "cat1"])
   assert.deepEqual(metadata.tagIds, ["tag"])
+  assert.deepEqual(metadata.labelIds, ["label"])
+  assert.deepEqual(metadata.seriesIds, ["series"])
   assert.equal(metadata.thumbnailUrl, "https://cdn.test/poster.webp")
   assert.equal(metadata.trailerUrl, "https://cdn.test/trailer.mp4")
   assert.equal(metadata.sourceUrl, "https://cdn.test/master.m3u8")
   assert.deepEqual(metadata.custom, { keep: true })
 })
 
-test("normal edits preserve all qualities and unrepresented channels/media", () => {
+test("normal edits preserve all relation groups and media", () => {
   const next = contentEditorReferences(
     { ...editorMetadata(content), dvdId: "changed" },
     content
   )
-  assert.deepEqual(new Set(next.channelIds), new Set(content.channelIds))
+  assert.deepEqual(next.studioIds, content.studioIds)
+  assert.deepEqual(next.actressIds, content.actressIds)
+  assert.deepEqual(next.actorIds, content.actorIds)
+  assert.deepEqual(next.directorIds, content.directorIds)
   assert.deepEqual(next.termIds, content.termIds)
   assert.deepEqual(next.mediaIds, content.mediaIds)
 })
@@ -137,15 +150,14 @@ test("reordering actors keeps their order; clearing poster does not drop video o
   const next = contentEditorReferences(
     {
       ...editorMetadata(content),
-      actorIds: ["actor1", "actor2"],
+      actorIds: ["actor1"],
+      actressIds: ["actor2"],
       thumbnailUrl: "",
     },
     content
   )
-  assert.deepEqual(
-    next.channelIds.filter((id) => id.startsWith("actor")),
-    ["actor1", "actor2"]
-  )
+  assert.deepEqual(next.actressIds, ["actor2"])
+  assert.deepEqual(next.actorIds, ["actor1"])
   assert.deepEqual(next.mediaIds, ["trailer", "v720", "v360", "sprite"])
 })
 
@@ -159,14 +171,27 @@ test("replacing video replaces its rendition set, retaining other slots", () => 
 
 test("role resolution supports new and existing channels without modifying IDs", () => {
   assert.deepEqual(
-    channelPositions("person", { roles: ["actor", "director"] }),
+    channelPositions("person", {
+      roles: ["actor", "director"],
+      gender: "male",
+    }),
     ["actors", "directors"]
+  )
+  assert.deepEqual(
+    channelPositions("person", { roles: ["actor"], gender: "female" }),
+    ["actresses"]
   )
   assert.deepEqual(
     channelPositions("organization", { roles: ["studio", "label"] }),
     ["studio", "label"]
   )
   assert.deepEqual(channelPositions("actor", {}), ["actors"])
+})
+
+test("channel handles collapse spaces into hyphens without role prefixes", () => {
+  assert.equal(channelHandleBase("  Jane   Wilde  "), "jane-wilde")
+  assert.equal(channelHandleBase("Studio  Name"), "studio-name")
+  assert.equal(channelHandleBase("Élite---Works"), "elite-works")
 })
 
 test("uncensored-leak imports prepend the category without duplicates", () => {
@@ -289,10 +314,14 @@ test("save persists only root IDs; registered remote IDs never cause re-download
   })
   const input = {
     metadata: {
-      studioId: "studio",
+      studioIds: ["studio"],
+      actressIds: ["actress"],
       actorIds: ["actor"],
+      directorIds: ["director"],
       categoryIds: ["cat"],
       tagIds: ["tag"],
+      labelIds: ["label"],
+      seriesIds: ["series"],
       posterMediaId: "poster",
       videoMediaId: ["v360", "v720"],
       thumbnailUrl: "https://cdn.test/poster.webp",
@@ -303,8 +332,11 @@ test("save persists only root IDs; registered remote IDs never cause re-download
   }
   await prepareContentReferences(input, "admin")
   assert.deepEqual(input, {
-    channelIds: ["studio", "actor"],
-    termIds: ["cat", "tag"],
+    studioIds: ["studio"],
+    actressIds: ["actress"],
+    actorIds: ["actor"],
+    directorIds: ["director"],
+    termIds: ["cat", "tag", "label", "series"],
     mediaIds: ["poster", "v360", "v720"],
     metadata: { dvdId: "keep", sourceVideoId: "linked-video" },
   })
@@ -406,7 +438,7 @@ test("manual remote URL creates a media record and is stripped from Content", as
 test("invalid IDs and failed uploads prevent saving", async () => {
   mock.method(ChannelModel, "countDocuments", async () => 0)
   await assert.rejects(
-    prepareContentReferences({ channelIds: ["missing"] }, "admin"),
+    prepareContentReferences({ studioIds: ["missing"] }, "admin"),
     /channel IDs/
   )
   mock.restoreAll()

@@ -37,6 +37,7 @@ export function HomeFeed({ categories: availableCategories, videos: initialVideo
     try {
       const url = new URL("/api/v1/home", window.location.origin)
       url.searchParams.set("category", category)
+      url.searchParams.set("locale", locale)
       const response = await fetch(url, { headers: { accept: "application/json" }, signal: controller.signal })
       if (!response.ok) throw new Error(`Home API returned ${response.status}`)
       const nextFeed = await response.json() as HomeFeedResponse
@@ -46,7 +47,7 @@ export function HomeFeed({ categories: availableCategories, videos: initialVideo
     } finally {
       if (requestRef.current === controller) setCategoryLoading(false)
     }
-  }, [])
+  }, [locale])
   React.useEffect(() => () => requestRef.current?.abort(), [])
   const { videos, shorts, playlists } = feed
   const labels = { views: (count: string) => t("views", { count }), published: (date: string) => t("published", { date }), moreOptions: t("moreOptions"), verified: t("verified") }

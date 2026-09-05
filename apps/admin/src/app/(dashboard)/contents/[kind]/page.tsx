@@ -5,7 +5,7 @@ import { notFound } from "next/navigation"
 
 import { Button, buttonVariants } from "@workspace/ui/components"
 
-import { getContents } from "@/lib/admin-api"
+import { getContents, getWorkerScraperSettings } from "@/lib/admin-api"
 import { isContentKind } from "@/lib/content"
 
 import { QuickContentImport } from "./quick-content-import"
@@ -44,7 +44,10 @@ export default async function ContentListPage({
     1,
     Number.parseInt(first(rawSearch.page) || "1", 10) || 1
   )
-  const data = await getContents({ kind, query, status, page, limit: 20 })
+  const [data, workerSettings] = await Promise.all([
+    getContents({ kind, query, status, page, limit: 20 }),
+    kind === "video" ? getWorkerScraperSettings() : Promise.resolve(null),
+  ])
   const kindLabel = t(`kinds.${kind}`)
 
   return (
@@ -76,7 +79,11 @@ export default async function ContentListPage({
         </div>
       </header>
 
-      {kind === "video" ? <QuickContentImport /> : null}
+      {kind === "video" ? (
+        <QuickContentImport
+          translationLocales={workerSettings?.missav.locales ?? []}
+        />
+      ) : null}
 
       <form
         className="grid gap-3 rounded-xl border bg-card p-4 sm:grid-cols-[minmax(0,1fr)_220px_auto]"
