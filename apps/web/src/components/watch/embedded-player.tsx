@@ -5,13 +5,26 @@ import type { Video } from "@workspace/core/types"
 import type { AdvertSettings } from "@workspace/core/validators"
 import * as React from "react"
 
-const playerStylesheet = publicNetworkUrl(
-  process.env.NEXT_PUBLIC_PLAYER_STYLESHEET_URL,
-  "https://media.avxtube.com/assets/v1.0.0/player.bundle.min.css"
+const devAssetVersion =
+  process.env.NEXT_PUBLIC_PLAYER_ASSET_VERSION || Date.now().toString(36)
+
+function versionPlayerAsset(url: string) {
+  if (process.env.NODE_ENV !== "development") return url
+  const separator = url.includes("?") ? "&" : "?"
+  return `${url}${separator}devBuild=${encodeURIComponent(devAssetVersion)}`
+}
+
+const playerStylesheet = versionPlayerAsset(
+  publicNetworkUrl(
+    process.env.NEXT_PUBLIC_PLAYER_STYLESHEET_URL,
+    "https://media.avxtube.com/assets/v1.0.0/player.bundle.min.css"
+  )
 )
-const playerScript = publicNetworkUrl(
-  process.env.NEXT_PUBLIC_PLAYER_SCRIPT_URL,
-  "https://media.avxtube.com/assets/v1.0.0/player.min.js"
+const playerScript = versionPlayerAsset(
+  publicNetworkUrl(
+    process.env.NEXT_PUBLIC_PLAYER_SCRIPT_URL,
+    "https://media.avxtube.com/assets/v1.0.0/player.min.js"
+  )
 )
 const jwPlayerScript = "//ssl.p.jwpcdn.com/player/v/8.49.10/jwplayer.js"
 
@@ -80,6 +93,9 @@ type PlayerHostBridge = {
 type PlayerEventDetail = {
   source?: string
   type?: string
+  videoId?: string | null
+  sessionId?: string | null
+  sequence?: number
   state?: PlayerPlaybackState
   action?: "restore" | "close"
 }
@@ -261,16 +277,20 @@ export function EmbeddedPlayer({
     onMiniPlayerRequest,
     onMiniPlayerAction,
   })
-  callbacks.current = {
-    onStateChange,
-    onMiniPlayerRequest,
-    onMiniPlayerAction,
-  }
-  const initialState = React.useRef(playbackState)
+  React.useLayoutEffect(() => {
+    callbacks.current = {
+      onStateChange,
+      onMiniPlayerRequest,
+      onMiniPlayerAction,
+    }
+  }, [onMiniPlayerAction, onMiniPlayerRequest, onStateChange])
+  const [initialPlaybackState] = React.useState(playbackState)
+  const activeSessionRef = React.useRef<string | null>(null)
+  const lastSequenceRef = React.useRef(0)
   const playerMountRef = React.useRef<HTMLDivElement>(null)
   const config = React.useMemo(
-    () => createConfig(video, initialState.current, adverts),
-    [adverts, video]
+    () => createConfig(video, initialPlaybackState, adverts),
+    [adverts, initialPlaybackState, video]
   )
 
   const syncMode = React.useCallback(() => {
@@ -299,7 +319,9 @@ export function EmbeddedPlayer({
     video.player?.vdoId,
   ])
   const syncModeRef = React.useRef(syncMode)
-  syncModeRef.current = syncMode
+  React.useLayoutEffect(() => {
+    syncModeRef.current = syncMode
+  }, [syncMode])
 
   React.useEffect(() => {
     if (!config) return
@@ -312,14 +334,42 @@ export function EmbeddedPlayer({
     let cancelled = false
     const receiveDetail = (detail: PlayerEventDetail | null | undefined) => {
       if (!detail || detail.source !== "code-player") return
+      const expectedVideoId = video.player?.vdoId
+      if (
+        detail.videoId &&
+        expectedVideoId &&
+        String(detail.videoId) !== String(expectedVideoId)
+      ) {
+        return
+      }
       if (detail.type === "bridge-ready") {
+        activeSessionRef.current = detail.sessionId || null
+        lastSequenceRef.current = detail.sequence || 0
         sendCommand(video.player?.vdoId, {
           action: "sync",
-          state: initialState.current,
+          state: initialPlaybackState,
           preserveAudio: true,
         })
         syncModeRef.current()
-      } else if (detail.type === "player-state") {
+      } else {
+        if (
+          activeSessionRef.current &&
+          detail.sessionId &&
+          detail.sessionId !== activeSessionRef.current
+        ) {
+          return
+        }
+        if (
+          typeof detail.sequence === "number" &&
+          detail.sequence <= lastSequenceRef.current
+        ) {
+          return
+        }
+        if (typeof detail.sequence === "number") {
+          lastSequenceRef.current = detail.sequence
+        }
+      }
+      if (detail.type === "player-state") {
         if (detail.state) callbacks.current.onStateChange?.(detail.state)
       } else if (detail.type === "mini-player-request") {
         if (detail.state) callbacks.current.onStateChange?.(detail.state)
@@ -361,6 +411,8 @@ export function EmbeddedPlayer({
 
     return () => {
       cancelled = true
+      activeSessionRef.current = null
+      lastSequenceRef.current = 0
       window.removeEventListener("message", receiveMessage)
       playerEvents.forEach((name) =>
         window.removeEventListener(name, receiveEvent)
@@ -372,7 +424,7 @@ export function EmbeddedPlayer({
       mount.replaceChildren()
       if (window.PLAYER_CONFIG === config) delete window.PLAYER_CONFIG
     }
-  }, [config, video.player?.vdoId])
+  }, [config, initialPlaybackState, video.player?.vdoId])
 
   React.useEffect(() => {
     syncMode()

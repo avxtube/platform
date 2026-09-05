@@ -17,6 +17,9 @@ type VideoPageProps = {
 }
 
 export const dynamic = "force-dynamic"
+// Keep each locale + video route in the browser router cache for the lifetime
+// of a normal tab session. Reloading the page clears this client-side cache.
+export const unstable_dynamicStaleTime = 31_536_000
 
 const getWatchPageData = cache((videoId: string, locale: Locale) =>
   getWatchData(videoId, locale)

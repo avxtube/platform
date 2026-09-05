@@ -29,6 +29,7 @@ type WatchPlayerContextValue = PlayerState & {
   ) => void
   dismiss: () => void
   openMiniPlayer: () => void
+  restoreMiniPlayer: () => void
   seek: (time: number) => void
   setSpeed: (speed: number) => void
   setVolume: (volume: number) => void
@@ -74,9 +75,19 @@ export function WatchPlayerProvider({
   const [playerSurface, setPlayerSurface] = React.useState<HTMLElement | null>(
     null
   )
+  const latestPlaybackRef = React.useRef<PlayerPlaybackState>({
+    currentTime: initialState.currentTime,
+    isPlaying: initialState.isPlaying,
+    muted: initialState.muted,
+    volume: initialState.volume,
+    speed: initialState.speed,
+    started: initialState.started,
+  })
   const playerSurfaceRef = React.useRef<HTMLElement | null>(null)
-  const activeSurface = React.useRef<PlayerSurface>("watch")
-  activeSurface.current =
+  const miniHistoryModeRef = React.useRef<"back" | "push" | null>(null)
+  const currentPathRef = React.useRef(pathname)
+  const previousPathRef = React.useRef<string | null>(null)
+  const activeSurface: PlayerSurface =
     pathname.startsWith("/watch") && !miniRequested ? "watch" : "mini"
 
   React.useEffect(() => {
@@ -85,6 +96,8 @@ export function WatchPlayerProvider({
     surface.style.display = "none"
     document.body.append(surface)
     playerSurfaceRef.current = surface
+    // The portal target can only be created in the browser after hydration.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setPlayerSurface(surface)
 
     return () => {
@@ -93,10 +106,37 @@ export function WatchPlayerProvider({
     }
   }, [])
 
+  React.useEffect(() => {
+    if (!pathname.startsWith("/watch")) return
+    // Warm the Home route while the viewer watches. Opening the miniplayer can
+    // then swap to the already prepared route instead of waiting for HomeFeed.
+    router.prefetch("/")
+  }, [pathname, router])
+
+  React.useEffect(() => {
+    if (currentPathRef.current !== pathname) {
+      previousPathRef.current = currentPathRef.current
+      currentPathRef.current = pathname
+    }
+    if (!miniHistoryModeRef.current) return
+    if (pathname === "/" || pathname.startsWith("/watch")) return
+    // The viewer continued browsing after opening the miniplayer, so Back no
+    // longer necessarily points at the originating Watch route.
+    miniHistoryModeRef.current = null
+  }, [pathname])
+
   const activate = React.useCallback(
     (video: Video, playlist: { id: string; index: number } | null = null) =>
       setState((current) => {
-        if (current.video?.id !== video.id)
+        if (current.video?.id !== video.id) {
+          latestPlaybackRef.current = {
+            currentTime: 0,
+            isPlaying: false,
+            muted: current.muted,
+            volume: current.volume,
+            speed: current.speed,
+            started: false,
+          }
           return {
             ...initialState,
             video,
@@ -105,6 +145,7 @@ export function WatchPlayerProvider({
             volume: current.volume,
             speed: current.speed,
           }
+        }
         if (
           current.playlist?.id === playlist?.id &&
           current.playlist?.index === playlist?.index
@@ -116,69 +157,118 @@ export function WatchPlayerProvider({
   )
   const togglePlaying = React.useCallback(
     () =>
-      setState((current) =>
-        current.video
-          ? { ...current, started: true, isPlaying: !current.isPlaying }
-          : current
-      ),
+      setState((current) => {
+        if (!current.video) return current
+        const isPlaying = !current.isPlaying
+        latestPlaybackRef.current = {
+          ...latestPlaybackRef.current,
+          isPlaying,
+          started: true,
+        }
+        return { ...current, started: true, isPlaying }
+      }),
     []
   )
   const toggleMuted = React.useCallback(
-    () => setState((current) => ({ ...current, muted: !current.muted })),
+    () =>
+      setState((current) => {
+        const muted = !current.muted
+        latestPlaybackRef.current = { ...latestPlaybackRef.current, muted }
+        return { ...current, muted }
+      }),
     []
   )
   const seek = React.useCallback(
     (time: number) =>
-      setState((current) => ({
-        ...current,
-        currentTime: Math.max(
+      setState((current) => {
+        const currentTime = Math.max(
           0,
           Math.min(current.video?.durationSeconds ?? 0, time)
-        ),
-      })),
+        )
+        latestPlaybackRef.current = {
+          ...latestPlaybackRef.current,
+          currentTime,
+        }
+        return { ...current, currentTime }
+      }),
     []
   )
   const setVolume = React.useCallback(
     (volume: number) =>
-      setState((current) => ({ ...current, volume, muted: volume === 0 })),
+      setState((current) => {
+        const muted = volume === 0
+        latestPlaybackRef.current = {
+          ...latestPlaybackRef.current,
+          volume,
+          muted,
+        }
+        return { ...current, volume, muted }
+      }),
     []
   )
   const setSpeed = React.useCallback(
-    (speed: number) => setState((current) => ({ ...current, speed })),
+    (speed: number) => {
+      latestPlaybackRef.current = { ...latestPlaybackRef.current, speed }
+      setState((current) => ({ ...current, speed }))
+    },
     []
   )
   const syncPlayback = React.useCallback(
     (patch: PlayerPlaybackState, surface: PlayerSurface) => {
-      if (surface !== activeSurface.current) return
-      setState((current) =>
-        current.video
-          ? {
-              ...current,
-              ...(typeof patch.currentTime === "number"
-                ? { currentTime: patch.currentTime }
-                : {}),
-              ...(typeof patch.isPlaying === "boolean"
-                ? { isPlaying: patch.isPlaying }
-                : {}),
-              ...(typeof patch.muted === "boolean"
-                ? { muted: patch.muted }
-                : {}),
-              ...(typeof patch.volume === "number"
-                ? { volume: patch.volume }
-                : {}),
-              ...(typeof patch.speed === "number"
-                ? { speed: patch.speed }
-                : {}),
-              ...(typeof patch.started === "boolean"
-                ? { started: current.started || patch.started }
-                : {}),
-            }
-          : current
-      )
+      if (surface !== activeSurface) return
+      const previous = latestPlaybackRef.current
+      const latest: PlayerPlaybackState = {
+        ...previous,
+        ...patch,
+        started:
+          previous.started === true || patch.started === true,
+      }
+      latestPlaybackRef.current = latest
+      setState((current) => {
+        if (!current.video) return current
+        const semanticChange =
+          (typeof patch.isPlaying === "boolean" &&
+            patch.isPlaying !== current.isPlaying) ||
+          (typeof patch.muted === "boolean" && patch.muted !== current.muted) ||
+          (typeof patch.volume === "number" && patch.volume !== current.volume) ||
+          (typeof patch.speed === "number" && patch.speed !== current.speed) ||
+          (patch.started === true && !current.started)
+        const nextTime =
+          typeof latest.currentTime === "number"
+            ? latest.currentTime
+            : current.currentTime
+        // Keep an exact mutable snapshot for route/mini transitions, but avoid
+        // rerendering the entire viewer four times per second for time events.
+        if (!semanticChange && Math.abs(nextTime - current.currentTime) < 1)
+          return current
+        return {
+          ...current,
+          currentTime: nextTime,
+          isPlaying:
+            typeof latest.isPlaying === "boolean"
+              ? latest.isPlaying
+              : current.isPlaying,
+          muted:
+            typeof latest.muted === "boolean" ? latest.muted : current.muted,
+          volume:
+            typeof latest.volume === "number" ? latest.volume : current.volume,
+          speed:
+            typeof latest.speed === "number" ? latest.speed : current.speed,
+          started: current.started || latest.started === true,
+        }
+      })
     },
-    []
+    [activeSurface]
   )
   const dismiss = React.useCallback(() => {
+    latestPlaybackRef.current = {
+      currentTime: 0,
+      isPlaying: false,
+      muted: latestPlaybackRef.current.muted,
+      volume: latestPlaybackRef.current.volume,
+      speed: latestPlaybackRef.current.speed,
+      started: false,
+    }
     setState((current) => ({
       ...initialState,
       muted: current.muted,
@@ -204,20 +294,51 @@ export function WatchPlayerProvider({
     // for the miniplayer surface. Without this, a fast route transition can
     // render the destination from the previous (not-started) snapshot.
     flushSync(() => {
-      setState((current) => ({ ...current, started: true }))
+      setState((current) => ({
+        ...current,
+        ...(typeof latestPlaybackRef.current.currentTime === "number"
+          ? { currentTime: latestPlaybackRef.current.currentTime }
+          : {}),
+        ...(typeof latestPlaybackRef.current.isPlaying === "boolean"
+          ? { isPlaying: latestPlaybackRef.current.isPlaying }
+          : {}),
+        started: true,
+      }))
       setMiniRequested(true)
     })
     const surface = playerSurfaceRef.current
     if (surface?.isConnected && surface.parentElement !== document.body)
       document.body.append(surface)
-    router.push("/")
+    if (previousPathRef.current === "/") {
+      miniHistoryModeRef.current = "back"
+      router.back()
+    } else {
+      miniHistoryModeRef.current = "push"
+      router.push("/")
+    }
   }, [router])
+  const restoreMiniPlayer = React.useCallback(() => {
+    if (!state.video) return
+    setMiniRequested(false)
+    if (pathname === "/" && miniHistoryModeRef.current) {
+      const historyMode = miniHistoryModeRef.current
+      miniHistoryModeRef.current = null
+      if (historyMode === "back") router.forward()
+      else router.back()
+      return
+    }
+    const watchHref = state.playlist
+      ? `/watch/${state.video.id}?list=${encodeURIComponent(state.playlist.id)}&index=${state.playlist.index}`
+      : `/watch/${state.video.id}`
+    router.push(watchHref)
+  }, [pathname, router, state.playlist, state.video])
   const value = React.useMemo(
     () => ({
       ...state,
       activate,
       dismiss,
       openMiniPlayer,
+      restoreMiniPlayer,
       registerWatchHost,
       seek,
       setSpeed,
@@ -230,6 +351,7 @@ export function WatchPlayerProvider({
       activate,
       dismiss,
       openMiniPlayer,
+      restoreMiniPlayer,
       registerWatchHost,
       seek,
       setSpeed,
@@ -308,23 +430,20 @@ function PersistentPlayer({
   visible: boolean
 }) {
   const t = useTranslations("video")
-  const router = useRouter()
   const syncPlayback = state.syncPlayback
   const syncCurrentPlayback = React.useCallback(
     (patch: PlayerPlaybackState) =>
       syncPlayback(patch, watchMode ? "watch" : "mini"),
     [syncPlayback, watchMode]
   )
-  const watchHref = state.playlist
-    ? `/watch/${video.id}?list=${encodeURIComponent(state.playlist.id)}&index=${state.playlist.index}`
-    : `/watch/${video.id}`
   const dismiss = state.dismiss
+  const restoreMiniPlayer = state.restoreMiniPlayer
   const handleMiniPlayerAction = React.useCallback(
     (action: "restore" | "close") => {
-      if (action === "restore") router.push(watchHref)
+      if (action === "restore") restoreMiniPlayer()
       else dismiss()
     },
-    [dismiss, router, watchHref]
+    [dismiss, restoreMiniPlayer]
   )
   const playerPlaybackState = React.useMemo<PlayerPlaybackState>(
     () => ({
@@ -349,6 +468,8 @@ function PersistentPlayer({
     if (!surface) return
     surface.style.removeProperty("display")
     surface.setAttribute("aria-label", t("nowPlaying", { title: video.title }))
+    // This HTMLElement is an imperative portal host, not React-owned markup.
+    // eslint-disable-next-line react-hooks/immutability
     surface.className = watchMode
       ? `absolute inset-0 z-10 overflow-hidden bg-black sm:rounded-xl ${visible ? "pointer-events-auto opacity-100" : "pointer-events-none opacity-0"}`
       : `fixed right-3 bottom-[calc(4.75rem+env(safe-area-inset-bottom))] z-[70] w-[calc(100vw-24px)] max-w-[400px] overflow-hidden rounded-xl border bg-background shadow-2xl lg:right-5 lg:bottom-5 ${visible ? "pointer-events-auto opacity-100" : "pointer-events-none opacity-0"}`
